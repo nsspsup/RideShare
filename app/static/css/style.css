@@ -1,5 +1,96 @@
+/* General body style */
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f0fff0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f0fff0; /* light greenish */
     color: #2e4d2e;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+}
+
+/* Header */
+h1, h2, h3 {
+    color: #1e6f43;
+    text-align: center;
+}
+
+/* Form styling */
+form {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #ffffff;
+    border: 1px solid #d6e5d6;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 128, 0, 0.1);
+}
+
+form input[type="text"],
+form input[type="number"],
+form select {
+    width: 100%;
+    padding: 8px;
+    margin: 10px 0;
+    border: 1px solid #cccccc;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+form button {
+    background-color: #3fa34d;
+    color: white;
+    padding: 10px 20px;
+    margin: 5px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+form button:hover {
+    background-color: #2c7e3e;
+}
+
+/* Map container */
+#map {
+    width: 95%;
+    max-width: 960px;
+    height: 500px;
+    margin: 30px auto;
+    border: 2px solid #b2d8b2;
+    border-radius: 10px;
+}
+
+/* Trip listing */
+ul {
+    list-style-type: none;
+    padding: 0;
+    max-width: 800px;
+    margin: 20px auto;
+}
+
+li {
+    background-color: #eaffea;
+    padding: 12px 20px;
+    margin: 10px 0;
+    border-left: 6px solid #3fa34d;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 128, 0, 0.1);
+}
+
+/* Join button in results */
+li button {
+    float: right;
+    background-color: #4caf50;
+    color: white;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 3px;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+li button:hover {
+    background-color: #3a923f;
 }

@@ -4,6 +4,8 @@ from flask_login import login_required, current_user
 from app import db
 from app.models import Trip
 from app.utils.geo import haversine, geocode_address
+import requests
+from datetime import datetime
 
 
 bp = Blueprint('trips', __name__, url_prefix='/trips')
@@ -28,31 +30,43 @@ def plan_trip():
         seats = request.form.get('available_seats')
         cost_split = request.form.get('cost_split')
         allow_dev = request.form.get('allow_deviation') == 'yes'
-        dev_km = request.form.get('max_deviation_km')
-        dev_pct = request.form.get('max_deviation_percent')
+        max_deviation_km = request.form.get('max_deviation_km')
+        dep_time_str = request.form.get('departure_time')
+        departure_time = datetime.strptime(dep_time_str, "%Y-%m-%dT%H:%M") if dep_time_str else None
 
-        # Temporary geocoding (fake until we hook in real API)
+        # Geocode start and end to get lat/lng
+        from app.utils.geo import geocode_address
         start_lat, start_lng = geocode_address(start)
         end_lat, end_lng = geocode_address(end)
 
-        if not start_lat or not end_lat:
-            flash("Invalid address entered. Please try again.")
-            return redirect(url_for('trips.plan_trip'))
+        # Fetch route geometry from OSRM
+        osrm_url = f"https://router.project-osrm.org/route/v1/driving/{start_lng},{start_lat};{end_lng},{end_lat}?overview=full&geometries=geojson"
+        route_geometry = None
+        try:
+            res = requests.get(osrm_url)
+            if res.status_code == 200:
+                data = res.json()
+                if data["routes"]:
+                    route_geometry = data["routes"][0]["geometry"]
+        except Exception as e:
+            print("Failed to fetch route from OSRM:", e)
 
+        # Create trip
         new_trip = Trip(
             driver_id=current_user.id,
             start_location=start,
             end_location=end,
-            available_seats=seats,
-            cost_split=cost_split,
-            allow_deviation=allow_dev,
-            max_deviation_km=dev_km if allow_dev else None,
-            max_deviation_percent=dev_pct if allow_dev else None,
             start_lat=start_lat,
             start_lng=start_lng,
             end_lat=end_lat,
-            end_lng=end_lng
+            end_lng=end_lng,
+            available_seats=seats,
+            cost_split=cost_split,
+            max_deviation_km = float(max_deviation_km) if max_deviation_km else None,
+            route_geometry=route_geometry,
+            departure_time=departure_time,
         )
+
         db.session.add(new_trip)
         db.session.commit()
         flash("Trip created successfully.")

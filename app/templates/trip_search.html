@@ -14,63 +14,66 @@
     <ul>
     {% for trip in results %}
         <li>
+            Departure: {{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}
             {{ trip.start_location }} → {{ trip.end_location }},
             Seats: {{ trip.available_seats }},
             Driver ID: {{ trip.driver_id }},
             Cost Split: {{ trip.cost_split }}
+            <button onclick="alert('Join request sent for trip ID {{ trip.id }}');">Join</button>
         </li>
     {% endfor %}
     </ul>
 {% endif %}
 
-<div id="map" style="height: 400px; margin-top: 20px;"></div>
+<div id="map" style="height: 500px; margin-top: 20px;"></div>
 
-<!-- Leaflet JS (NO integrity!) -->
+<!-- Leaflet CSS -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+/>
+
+<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 
 <script>
-  var map = L.map('map').setView([48.15, 17.11], 7);  // fallback view (Bratislava)
+  const map = L.map('map').setView([48.15, 17.11], 7);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
   }).addTo(map);
 
-  var bounds = [];
+  const bounds = L.latLngBounds();
 
   {% for trip in results %}
-    {% if trip.start_lat and trip.start_lng and trip.end_lat and trip.end_lng %}
-      // Start marker (default icon)
-      var start = L.marker([{{ trip.start_lat }}, {{ trip.start_lng }}])
-        .addTo(map)
-        .bindPopup(`
-          <b>{{ trip.start_location }} → {{ trip.end_location }}</b><br>
-          Seats: {{ trip.available_seats }}<br>
-          Cost: {{ trip.cost_split }}
-        `);
-
-      // End marker (small green circle)
-      var end = L.circleMarker([{{ trip.end_lat }}, {{ trip.end_lng }}], {
-        color: 'green',
-        radius: 6
+    {% if trip.route_geometry %}
+      const geojson = {{ trip.route_geometry|safe }};
+      const route = L.geoJSON(geojson, {
+        style: {
+          color: 'blue',
+          weight: 4,
+          opacity: 0.7
+        }
       }).addTo(map);
 
-      // Line between start and end
-      var line = L.polyline([
-        [{{ trip.start_lat }}, {{ trip.start_lng }}],
-        [{{ trip.end_lat }}, {{ trip.end_lng }}]
-      ], {
-        color: 'blue',
-        weight: 2,
-        dashArray: '4 4'
-      }).addTo(map);
+      route.on('mouseover', () => route.setStyle({ color: 'orange', weight: 6 }));
+      route.on('mouseout', () => route.setStyle({ color: 'blue', weight: 4 }));
 
-      // Expand bounds
-      bounds.push(start.getLatLng());
-      bounds.push(end.getLatLng());
+      // Extend map bounds to fit route
+      route.getBounds().isValid() && bounds.extend(route.getBounds());
+
+      // Optional: Add marker at start and end
+      const coords = geojson.coordinates;
+      if (coords.length >= 2) {
+        const start = [coords[0][1], coords[0][0]];
+        const end = [coords[coords.length - 1][1], coords[coords.length - 1][0]];
+        L.marker(start).addTo(map).bindPopup("Start: {{ trip.start_location }}");
+        L.marker(end).addTo(map).bindPopup("End: {{ trip.end_location }}");
+      }
     {% endif %}
   {% endfor %}
 
-  if (bounds.length > 0) {
-    map.fitBounds(bounds, { padding: [30, 30] });
+  if (bounds.isValid()) {
+    map.fitBounds(bounds, { padding: [50, 50] });
   }
 </script>
 {% endblock %}

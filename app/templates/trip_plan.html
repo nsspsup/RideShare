@@ -1,23 +1,104 @@
 {% extends "layout.html" %}
 {% block content %}
 <h2>Plan a Trip</h2>
-<form method="POST">
-    Start Location: <input type="text" name="start_location" required><br>
-    End Location: <input type="text" name="end_location" required><br>
-    Available Seats: <input type="number" name="available_seats" min="1" required><br>
-    Cost Split Model:
-    <select name="cost_split">
-        <option value="50/50">50% driver / 50% passenger</option>
-        <option value="0/100">Free ride for passenger</option>
-        <option value="custom">Custom</option>
-    </select><br>
-    Allow Route Deviation?
-    <select name="allow_deviation">
-        <option value="no">No</option>
-        <option value="yes">Yes</option>
-    </select><br>
-    Max Deviation (km): <input type="number" step="0.1" name="max_deviation_km"><br>
-    Max Deviation (%): <input type="number" step="0.1" name="max_deviation_percent"><br>
-    <button type="submit">Submit</button>
+
+<form id="tripForm" method="POST">
+    <label for="departure_time">Departure Time:</label>
+    <input type="datetime-local" name="departure_time" id="departure_time" required>
+
+    Start Location: <input type="text" id="start_location" name="start_location" required><br>
+    End Location: <input type="text" id="end_location" name="end_location" required><br>
+    Available Seats: <input type="number" name="available_seats" min="1" max="8" required><br>
+    Cost Split: <input type="text" name="cost_split" placeholder="e.g., 50/50"><br>
+
+    Max Deviation (km): <input type="number" name="max_deviation_km"><br>
+
+    <!-- This will hold the selected route GeoJSON -->
+    <input type="hidden" id="route_geometry" name="route_geometry">
+
+    <button type="submit">Submit Trip</button>
+    <button type="button" onclick="previewRoute()">Preview Routes</button>
 </form>
+
+<div id="map" style="height: 500px; margin-top: 20px;"></div>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+<script>
+let map = L.map('map').setView([48.15, 17.11], 7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+let routeLayers = [];
+let selectedRouteLayer = null;
+
+async function geocode(query) {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
+    const response = await fetch(url, {
+        headers: { "User-Agent": "RideShareApp (email@example.com)" }
+    });
+    const data = await response.json();
+    return data.length > 0 ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
+}
+
+async function previewRoute() {
+    const startInput = document.getElementById('start_location').value;
+    const endInput = document.getElementById('end_location').value;
+
+    const startCoords = await geocode(startInput);
+    const endCoords = await geocode(endInput);
+
+    if (!startCoords || !endCoords) {
+        alert("Could not geocode addresses.");
+        return;
+    }
+
+    const url = `https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson&alternatives=true`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    // Clear previous
+    routeLayers.forEach(r => map.removeLayer(r));
+    routeLayers = [];
+    selectedRouteLayer = null;
+
+    if (!data.routes || data.routes.length === 0) {
+        alert("No route found.");
+        return;
+    }
+
+    data.routes.forEach((route, index) => {
+        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+        const layer = L.polyline(coords, {
+            color: 'orange',
+            weight: 5,
+            opacity: 0.6
+        }).addTo(map);
+
+        layer.on('click', () => {
+            // Reset styles
+            routeLayers.forEach(r => r.setStyle({ color: 'orange', weight: 4, opacity: 0.6 }));
+            layer.setStyle({ color: 'blue', weight: 5, opacity: 1.0 });
+
+            selectedRouteLayer = route;
+            document.getElementById('route_geometry').value = JSON.stringify(route.geometry);
+        });
+
+        // Auto-select first
+        if (index === 0) {
+            layer.setStyle({ color: 'blue', weight: 5, opacity: 1.0 });
+            selectedRouteLayer = route;
+            document.getElementById('route_geometry').value = JSON.stringify(route.geometry);
+        }
+
+        routeLayers.push(layer);
+    });
+
+    const bounds = L.latLngBounds(routeLayers.flatMap(layer => layer.getLatLngs()));
+    map.fitBounds(bounds, { padding: [40, 40] });
+}
+</script>
 {% endblock %}
