@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Plan a Trip</h2>
+<form method="POST">
+    Start Location: <input type="text" name="start_location" required><br>
+    End Location: <input type="text" name="end_location" required><br>
+    Available Seats: <input type="number" name="available_seats" min="1" required><br>
+    Cost Split Model:
+    <select name="cost_split">
+        <option value="50/50">50% driver / 50% passenger</option>
+        <option value="0/100">Free ride for passenger</option>
+        <option value="custom">Custom</option>
+    </select><br>
+    Allow Route Deviation?
+    <select name="allow_deviation">
+        <option value="no">No</option>
+        <option value="yes">Yes</option>
+    </select><br>
+    Max Deviation (km): <input type="number" step="0.1" name="max_deviation_km"><br>
+    Max Deviation (%): <input type="number" step="0.1" name="max_deviation_percent"><br>
+    <button type="submit">Submit</button>
+</form>
+{% endblock %}

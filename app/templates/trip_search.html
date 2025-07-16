@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Search for a Trip</h2>
+
+<form method="POST">
+    Start Location: <input type="text" name="start_location" required><br>
+    End Location: <input type="text" name="end_location" required><br>
+    Max Distance (km): <input type="number" name="radius" value="20" min="1"><br>
+    <button type="submit">Search</button>
+</form>
+
+{% if results %}
+    <h3>Matched Trips:</h3>
+    <ul>
+    {% for trip in results %}
+        <li>
+            {{ trip.start_location }} → {{ trip.end_location }},
+            Seats: {{ trip.available_seats }},
+            Driver ID: {{ trip.driver_id }},
+            Cost Split: {{ trip.cost_split }}
+        </li>
+    {% endfor %}
+    </ul>
+{% endif %}
+
+<div id="map" style="height: 400px; margin-top: 20px;"></div>
+
+<!-- Leaflet JS (NO integrity!) -->
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+<script>
+  var map = L.map('map').setView([48.15, 17.11], 7);  // fallback view (Bratislava)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  var bounds = [];
+
+  {% for trip in results %}
+    {% if trip.start_lat and trip.start_lng and trip.end_lat and trip.end_lng %}
+      // Start marker (default icon)
+      var start = L.marker([{{ trip.start_lat }}, {{ trip.start_lng }}])
+        .addTo(map)
+        .bindPopup(`
+          <b>{{ trip.start_location }} → {{ trip.end_location }}</b><br>
+          Seats: {{ trip.available_seats }}<br>
+          Cost: {{ trip.cost_split }}
+        `);
+
+      // End marker (small green circle)
+      var end = L.circleMarker([{{ trip.end_lat }}, {{ trip.end_lng }}], {
+        color: 'green',
+        radius: 6
+      }).addTo(map);
+
+      // Line between start and end
+      var line = L.polyline([
+        [{{ trip.start_lat }}, {{ trip.start_lng }}],
+        [{{ trip.end_lat }}, {{ trip.end_lng }}]
+      ], {
+        color: 'blue',
+        weight: 2,
+        dashArray: '4 4'
+      }).addTo(map);
+
+      // Expand bounds
+      bounds.push(start.getLatLng());
+      bounds.push(end.getLatLng());
+    {% endif %}
+  {% endfor %}
+
+  if (bounds.length > 0) {
+    map.fitBounds(bounds, { padding: [30, 30] });
+  }
+</script>
+{% endblock %}
