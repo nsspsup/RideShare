@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+    <title>Ride Share 3</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Ride Share 3 🌿</h1>
+        <nav>
+            <a href="{{ url_for('main.index') }}">Home</a> |
+            <a href="#">Register</a> |
+            <a href="#">Login</a>
+        </nav>
+        <hr>
+    </header>
+    {% block content %}{% endblock %}
+</body>
+</html>
