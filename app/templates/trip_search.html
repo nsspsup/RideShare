@@ -1,39 +1,55 @@
 {% extends "layout.html" %}
 {% block content %}
-<h2>Search for a Trip</h2>
+<div class="container mt-4">
+  <h2 class="mb-4">Search for a Trip</h2>
 
-<form method="POST">
-    Start Location: <input type="text" name="start_location" required><br>
-    End Location: <input type="text" name="end_location" required><br>
-    Max Distance (km): <input type="number" name="radius" value="20" min="1"><br>
-    <button type="submit">Search</button>
-</form>
+  <form method="POST" class="row g-3">
+    <div class="col-md-4">
+      <label for="start_location" class="form-label">Start Location</label>
+      <input type="text" class="form-control" name="start_location" id="start_location" required>
+    </div>
 
-{% if results %}
-    <h3>Matched Trips:</h3>
-    <ul>
-    {% for trip in results %}
-        <li>
-            Departure: {{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}
-            {{ trip.start_location }} → {{ trip.end_location }},
-            Seats: {{ trip.available_seats }},
-            Driver ID: {{ trip.driver_id }},
-            Cost Split: {{ trip.cost_split }}
-            <button onclick="alert('Join request sent for trip ID {{ trip.id }}');">Join</button>
+    <div class="col-md-4">
+      <label for="end_location" class="form-label">End Location</label>
+      <input type="text" class="form-control" name="end_location" id="end_location" required>
+    </div>
+
+    <div class="col-md-4">
+      <label for="radius" class="form-label">Max Distance (km)</label>
+      <input type="number" class="form-control" name="radius" id="radius" value="20" min="1">
+    </div>
+
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">Search</button>
+    </div>
+  </form>
+
+  {% if results %}
+    <h3 class="mt-5">Matched Trips</h3>
+    <ul class="list-group mb-4">
+      {% for trip in results %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ trip.start_location }}</strong> → <strong>{{ trip.end_location }}</strong><br>
+            <small class="text-muted">
+              Departure: {{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }} |
+              Seats: {{ trip.available_seats }} |
+              Cost Split: {{ trip.cost_split }}
+            </small>
+          </div>
+          <button class="btn btn-sm btn-outline-success" onclick="alert('Join request sent for trip ID {{ trip.id }}');">
+            Join
+          </button>
         </li>
-    {% endfor %}
+      {% endfor %}
     </ul>
-{% endif %}
+  {% endif %}
 
-<div id="map" style="height: 500px; margin-top: 20px;"></div>
+  <div id="map" class="mt-4 mb-5" style="height: 500px;"></div>
+</div>
 
-<!-- Leaflet CSS -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
-/>
-
-<!-- Leaflet JS -->
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 
 <script>
@@ -48,20 +64,14 @@
     {% if trip.route_geometry %}
       const geojson = {{ trip.route_geometry|safe }};
       const route = L.geoJSON(geojson, {
-        style: {
-          color: 'blue',
-          weight: 4,
-          opacity: 0.7
-        }
+        style: { color: 'blue', weight: 4, opacity: 0.7 }
       }).addTo(map);
 
       route.on('mouseover', () => route.setStyle({ color: 'orange', weight: 6 }));
       route.on('mouseout', () => route.setStyle({ color: 'blue', weight: 4 }));
 
-      // Extend map bounds to fit route
-      route.getBounds().isValid() && bounds.extend(route.getBounds());
+      bounds.extend(route.getBounds());
 
-      // Optional: Add marker at start and end
       const coords = geojson.coordinates;
       if (coords.length >= 2) {
         const start = [coords[0][1], coords[0][0]];

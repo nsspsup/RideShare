@@ -2,10 +2,12 @@ from flask import Blueprint
 from flask import render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app import db
-from app.models import Trip
+from app.models import Trip, Car
 from app.utils.geo import haversine, geocode_address
 import requests
 from datetime import datetime
+
+
 
 
 bp = Blueprint('trips', __name__, url_prefix='/trips')
@@ -25,6 +27,14 @@ def fake_geocode(address):
 @login_required
 def plan_trip():
     if request.method == 'POST':
+
+        # Inside your plan_trip POST logic
+        user_cars = Car.query.filter_by(user_id=current_user.id).all()
+
+        if not user_cars:
+            flash("You must add at least one car before planning a trip.", "warning")
+            return redirect(url_for('main.profile'))
+
         start = request.form.get('start_location')
         end = request.form.get('end_location')
         seats = request.form.get('available_seats')
@@ -106,3 +116,18 @@ def search_trip():
             flash("No trips found. Try broadening your search.")
 
     return render_template('trip_search.html', results=results)
+
+
+@bp.route('/delete/<int:trip_id>', methods=['POST'])
+@login_required
+def delete_trip(trip_id):
+    trip = Trip.query.get_or_404(trip_id)
+
+    if current_user.id == trip.driver_id or getattr(current_user, 'is_admin', False):
+        db.session.delete(trip)
+        db.session.commit()
+        flash("Trip deleted.", "success")
+    else:
+        flash("Unauthorized to delete this trip.", "danger")
+
+    return redirect(url_for('trips.plan_trip'))

@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Edit Car</h2>
+
+  <form method="POST" class="row g-3">
+    <div class="col-md-4">
+      <label class="form-label">Make</label>
+      <input name="make" class="form-control" value="{{ car.make }}" required>
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">Model</label>
+      <input name="model" class="form-control" value="{{ car.model }}" required>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Plate</label>
+      <input name="plate" class="form-control" value="{{ car.plate }}" required>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Seats</label>
+      <input name="seats" type="number" class="form-control" min="1" value="{{ car.seats }}" required>
+    </div>
+
+    <div class="col-12 d-flex justify-content-between">
+      <button type="submit" class="btn btn-primary">Update</button>
+      <a href="{{ url_for('cars.manage_cars') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -3,6 +3,8 @@ from flask_login import LoginManager
 from dotenv import load_dotenv
 from app.models import db, User  # db defined in models.py
 from flask_migrate import Migrate
+from app.routes import admin, trips, cars, proxy, users  # Import admin blueprint
+
 
 login_manager = LoginManager()
 migrate = Migrate()
@@ -26,6 +28,9 @@ def create_app():
     app.register_blueprint(main.bp)
     app.register_blueprint(users.bp)
     app.register_blueprint(trips.bp)
+    app.register_blueprint(admin.bp)
+    app.register_blueprint(cars.bp)
+    app.register_blueprint(proxy.bp)
 
     return app
 

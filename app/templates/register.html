@@ -1,12 +1,31 @@
 {% extends "layout.html" %}
 {% block content %}
-<h2>Register</h2>
-<form method="POST">
-    Email: <input type="email" name="email" required><br>
-    Password: <input type="password" name="password" required><br>
-    First Name: <input type="text" name="first_name" required><br>
-    Last Name: <input type="text" name="last_name" required><br>
-    National ID: <input type="text" name="national_id" required><br>
-    <button type="submit">Register</button>
-</form>
+<div class="container mt-5" style="max-width: 500px;">
+  <h2 class="mb-4 text-center">Register</h2>
+  <form method="POST" class="border rounded-3 shadow p-4 bg-light">
+    <div class="mb-3">
+      <label for="email" class="form-label">Email</label>
+      <input type="email" id="email" name="email" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label for="password" class="form-label">Password</label>
+      <input type="password" id="password" name="password" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label for="first_name" class="form-label">First Name</label>
+      <input type="text" id="first_name" name="first_name" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label for="last_name" class="form-label">Last Name</label>
+      <input type="text" id="last_name" name="last_name" class="form-control" required>
+    </div>
+    <div class="mb-4">
+      <label for="national_id" class="form-label">National ID / Passport</label>
+      <input type="text" id="national_id" name="national_id" class="form-control" required>
+    </div>
+    <div class="d-grid">
+      <button type="submit" class="btn btn-primary">Register</button>
+    </div>
+  </form>
+</div>
 {% endblock %}

@@ -1,7 +1,28 @@
 {% extends "layout.html" %}
 {% block content %}
-    <h2>Welcome to Ride Share 3</h2>
-    <p>People sharing today: {{ sharing_today }}</p>
-    <p>Total rides shared: {{ total_shared }}</p>
-    <p>CO₂ saved: {{ co2_saved }} kg</p>
+<div class="container mt-5 text-center">
+  <h2 class="mb-4">Welcome to <strong>Ride Share 3</strong></h2>
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow rounded-3 mb-3">
+        <div class="card-body">
+          <h5 class="card-title">People Sharing Today</h5>
+          <p class="display-6 text-success">{{ sharing_today }}</p>
+        </div>
+      </div>
+      <div class="card shadow rounded-3 mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Total Rides Shared</h5>
+          <p class="display-6 text-primary">{{ total_shared }}</p>
+        </div>
+      </div>
+      <div class="card shadow rounded-3">
+        <div class="card-body">
+          <h5 class="card-title">CO₂ Saved</h5>
+          <p class="display-6 text-info">{{ co2_saved }} kg</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

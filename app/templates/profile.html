@@ -1,24 +1,49 @@
 {% extends "layout.html" %}
 {% block content %}
-<h2>User Profile</h2>
-<p><strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}</p>
-<p><strong>ID/Passport:</strong> {{ user.national_id }}</p>
+<div class="container mt-4">
+  <h2 class="mb-4">User Profile</h2>
 
-<h3>Car Info (optional)</h3>
-<form method="POST">
-    Type: <input type="text" name="car_type" value="{{ user.car_type or '' }}"><br>
-    Model: <input type="text" name="car_model" value="{{ user.car_model or '' }}"><br>
-    Year: <input type="number" name="year_of_make" value="{{ user.year_of_make or '' }}"><br>
-    Seats: <input type="number" name="seats" value="{{ user.seats or '' }}"><br>
-    Fuel Type:
-    <select name="fuel_type">
-        <option value="">-- select --</option>
-        <option value="Petrol" {% if user.fuel_type == 'Petrol' %}selected{% endif %}>Petrol</option>
-        <option value="Diesel" {% if user.fuel_type == 'Diesel' %}selected{% endif %}>Diesel</option>
-        <option value="Electric" {% if user.fuel_type == 'Electric' %}selected{% endif %}>Electric</option>
-        <option value="Other" {% if user.fuel_type == 'Other' %}selected{% endif %}>Other</option>
-    </select><br>
-    Avg. Consumption (€/100km): <input type="number" step="0.1" name="avg_consumption" value="{{ user.avg_consumption or '' }}"><br>
-    <button type="submit">Save</button>
-</form>
+  <div class="mb-4">
+    <p><strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}</p>
+    <p><strong>Email:</strong> {{ user.email }}</p>
+    <p><strong>ID/Passport:</strong> {{ user.national_id }}</p>
+  </div>
+
+  {% if user.cars %}
+  <h4 class="mb-3">My Cars</h4>
+  <ul class="list-group mb-4">
+    {% for car in user.cars %}
+    <li class="list-group-item">
+      {{ car.make }} {{ car.model }} ({{ car.year_of_make }}) – {{ car.plate }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <a href="{{ url_for('cars.manage_cars') }}" class="btn btn-outline-success mb-4">Manage My Cars</a>
+
+  <hr>
+
+  <h4 class="mb-3">Change Password</h4>
+  <form method="POST" action="{{ url_for('users.change_password') }}" class="row g-3">
+    <div class="col-md-6">
+      <label for="current_password" class="form-label">Current Password</label>
+      <input type="password" class="form-control" name="current_password" required>
+    </div>
+    <div class="col-md-6">
+      <label for="new_password" class="form-label">New Password</label>
+      <input type="password" class="form-control" name="new_password" required>
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">Update Password</button>
+    </div>
+  </form>
+
+  <hr>
+
+  <h4 class="mt-4 text-danger">Delete Profile</h4>
+  <form method="POST" action="{{ url_for('users.delete_profile') }}" onsubmit="return confirm('Are you sure you want to delete your profile? This cannot be undone.');">
+    <button type="submit" class="btn btn-danger">Delete My Account</button>
+  </form>
+</div>
 {% endblock %}

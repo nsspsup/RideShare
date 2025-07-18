@@ -1,6 +1,6 @@
-from flask import Blueprint
-from flask import render_template, request, redirect, url_for, flash
-from flask_login import login_required, current_user
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_required, current_user, logout_user
+from werkzeug.security import check_password_hash, generate_password_hash
 from app import db
 from app.models import User
 
@@ -21,3 +21,36 @@ def profile():
         return redirect(url_for('users.profile'))
 
     return render_template('profile.html', user=current_user)
+
+@bp.route('/change-password', methods=['POST'])
+@login_required
+def change_password():
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+
+    if not (current_password and new_password):
+        flash("All fields are required.", "danger")
+        return redirect(url_for('users.profile'))
+
+    if not check_password_hash(current_user.password_hash, current_password):
+        flash("Current password is incorrect.", "danger")
+        return redirect(url_for('users.profile'))
+
+    current_user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    flash("Password updated successfully.", "success")
+    return redirect(url_for('users.profile'))
+
+
+@bp.route('/delete', methods=['POST'])
+@login_required
+def delete_profile():
+    user_id = current_user.id
+    logout_user()  # Important: log the user out first
+    user = User.query.get_or_404(user_id)
+
+    db.session.delete(user)
+    db.session.commit()
+
+    flash("Your profile has been deleted.", "warning")
+    return redirect(url_for('main.index'))

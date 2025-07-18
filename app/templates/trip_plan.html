@@ -1,28 +1,74 @@
 {% extends "layout.html" %}
 {% block content %}
-<h2>Plan a Trip</h2>
+<div class="container">
+  <h2 class="mb-4">Plan a Trip</h2>
 
-<form id="tripForm" method="POST">
-    <label for="departure_time">Departure Time:</label>
-    <input type="datetime-local" name="departure_time" id="departure_time" required>
+  <form id="tripForm" method="POST" class="row g-3">
+    <div class="col-md-6">
+      <label for="departure_time" class="form-label">Departure Time</label>
+      <input type="datetime-local" name="departure_time" id="departure_time" class="form-control" required>
+    </div>
 
-    Start Location: <input type="text" id="start_location" name="start_location" required><br>
-    End Location: <input type="text" id="end_location" name="end_location" required><br>
-    Available Seats: <input type="number" name="available_seats" min="1" max="8" required><br>
-    Cost Split: <input type="text" name="cost_split" placeholder="e.g., 50/50"><br>
+    <div class="col-md-6">
+      <label for="start_location" class="form-label">Start Location</label>
+      <input type="text" id="start_location" name="start_location" class="form-control" required>
+    </div>
 
-    Max Deviation (km): <input type="number" name="max_deviation_km"><br>
+    <div class="col-md-6">
+      <label for="end_location" class="form-label">End Location</label>
+      <input type="text" id="end_location" name="end_location" class="form-control" required>
+    </div>
 
-    <!-- This will hold the selected route GeoJSON -->
+    <div class="col-md-4">
+      <label for="available_seats" class="form-label">Available Seats</label>
+      <input type="number" name="available_seats" class="form-control" min="1" max="8" required>
+    </div>
+
+    <div class="col-md-4">
+      <label for="cost_split" class="form-label">Cost Split</label>
+      <input type="text" name="cost_split" class="form-control" placeholder="e.g., 50/50">
+    </div>
+
+    <div class="col-md-4">
+      <label for="max_deviation_km" class="form-label">Max Deviation (km)</label>
+      <input type="number" name="max_deviation_km" class="form-control">
+    </div>
+
     <input type="hidden" id="route_geometry" name="route_geometry">
 
-    <button type="submit">Submit Trip</button>
-    <button type="button" onclick="previewRoute()">Preview Routes</button>
-</form>
+    <div class="col-12">
+      <button type="submit" class="btn btn-success">Submit Trip</button>
+      <button type="button" onclick="previewRoute()" class="btn btn-outline-primary">Preview Routes</button>
+    </div>
+  </form>
 
-<div id="map" style="height: 500px; margin-top: 20px;"></div>
+  <div id="map" class="mt-4 mb-5" style="height: 500px;"></div>
 
-<!-- Leaflet -->
+  <hr class="my-4">
+
+  <h2>Your Planned Trips</h2>
+  {% if current_user.trips %}
+    <ul class="list-group mb-4">
+      {% for trip in current_user.trips %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ trip.start_location }}</strong> → <strong>{{ trip.end_location }}</strong><br>
+            <small class="text-muted">Departure: {{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</small>
+          </div>
+          {% if current_user.id == trip.driver_id or current_user.is_admin %}
+          <form action="{{ url_for('trips.delete_trip', trip_id=trip.id) }}" method="POST" class="ms-3">
+            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this trip?');">Delete</button>
+          </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You haven’t planned any trips yet.</p>
+  {% endif %}
+</div>
+
+<!-- Leaflet CSS/JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 
@@ -36,69 +82,73 @@ let routeLayers = [];
 let selectedRouteLayer = null;
 
 async function geocode(query) {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
-    const response = await fetch(url, {
-        headers: { "User-Agent": "RideShareApp (email@example.com)" }
-    });
-    const data = await response.json();
-    return data.length > 0 ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
+  const response = await fetch(url, {
+    headers: { "User-Agent": "RideShareApp (email@example.com)" }
+  });
+  const data = await response.json();
+  return data.length > 0 ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
 }
 
 async function previewRoute() {
-    const startInput = document.getElementById('start_location').value;
-    const endInput = document.getElementById('end_location').value;
+  const startInput = document.getElementById('start_location').value;
+  const endInput = document.getElementById('end_location').value;
 
-    const startCoords = await geocode(startInput);
-    const endCoords = await geocode(endInput);
+  const startCoords = await geocode(startInput);
+  const endCoords = await geocode(endInput);
 
-    if (!startCoords || !endCoords) {
-        alert("Could not geocode addresses.");
-        return;
-    }
+  if (!startCoords || !endCoords) {
+    alert("Could not geocode addresses.");
+    return;
+  }
 
-    const url = `https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson&alternatives=true`;
+  const url = `/proxy/osrm?start=${startCoords[1]},${startCoords[0]}&end=${endCoords[1]},${endCoords[0]}`;
+  console.log("Requesting route:", url);
+
+  try {
     const response = await fetch(url);
     const data = await response.json();
 
-    // Clear previous
-    routeLayers.forEach(r => map.removeLayer(r));
-    routeLayers = [];
-    selectedRouteLayer = null;
-
-    if (!data.routes || data.routes.length === 0) {
-        alert("No route found.");
-        return;
+    if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
+      alert("No route found.");
+      return;
     }
 
+    // Clear previous routes
+    routeLayers.forEach(layer => map.removeLayer(layer));
+    routeLayers = [];
+
     data.routes.forEach((route, index) => {
-        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-        const layer = L.polyline(coords, {
-            color: 'orange',
-            weight: 5,
-            opacity: 0.6
-        }).addTo(map);
+      const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      const layer = L.polyline(coords, {
+        color: index === 0 ? 'blue' : 'orange',
+        weight: index === 0 ? 5 : 4,
+        opacity: index === 0 ? 1.0 : 0.6
+      }).addTo(map);
 
-        layer.on('click', () => {
-            // Reset styles
-            routeLayers.forEach(r => r.setStyle({ color: 'orange', weight: 4, opacity: 0.6 }));
-            layer.setStyle({ color: 'blue', weight: 5, opacity: 1.0 });
+      if (index === 0) {
+        selectedRouteLayer = route;
+        document.getElementById('route_geometry').value = JSON.stringify(route.geometry);
+      }
 
-            selectedRouteLayer = route;
-            document.getElementById('route_geometry').value = JSON.stringify(route.geometry);
-        });
+      layer.on('click', () => {
+        routeLayers.forEach(r => r.setStyle({ color: 'orange', weight: 4, opacity: 0.6 }));
+        layer.setStyle({ color: 'blue', weight: 5, opacity: 1.0 });
+        selectedRouteLayer = route;
+        document.getElementById('route_geometry').value = JSON.stringify(route.geometry);
+      });
 
-        // Auto-select first
-        if (index === 0) {
-            layer.setStyle({ color: 'blue', weight: 5, opacity: 1.0 });
-            selectedRouteLayer = route;
-            document.getElementById('route_geometry').value = JSON.stringify(route.geometry);
-        }
-
-        routeLayers.push(layer);
+      routeLayers.push(layer);
     });
 
     const bounds = L.latLngBounds(routeLayers.flatMap(layer => layer.getLatLngs()));
     map.fitBounds(bounds, { padding: [40, 40] });
+
+  } catch (error) {
+    console.error("Route preview failed:", error);
+    alert("Failed to fetch routes. Please try again.");
+  }
 }
+
 </script>
 {% endblock %}

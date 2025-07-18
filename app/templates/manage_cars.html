@@ -1,0 +1,87 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">My Cars</h2>
+
+  {% if cars %}
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Make</th>
+            <th>Model</th>
+            <th>Year</th>
+            <th>Seats</th>
+            <th>Fuel Type</th>
+            <th>Plate</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for car in cars %}
+            <tr>
+              <td>{{ car.make }}</td>
+              <td>{{ car.model }}</td>
+              <td>{{ car.year_of_make }}</td>
+              <td>{{ car.seats }}</td>
+              <td>{{ car.fuel_type }}</td>
+              <td>{{ car.plate }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('cars.delete_car', car_id=car.id) }}" style="display:inline;">
+                  <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this car?');">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="text-muted">You don’t have any cars added yet.</p>
+  {% endif %}
+
+  <hr class="my-4">
+
+  <h4 class="mb-3">Add New Car</h4>
+  <form method="POST" class="row g-3">
+    <div class="col-md-4">
+      <label for="car_make" class="form-label">Make</label>
+      <input type="text" name="car_make" id="car_make" class="form-control" required>
+    </div>
+    <div class="col-md-4">
+      <label for="model" class="form-label">Model</label>
+      <input type="text" name="model" id="model" class="form-control" required>
+    </div>
+    <div class="col-md-4">
+      <label for="plate" class="form-label">Plate</label>
+      <input type="text" name="plate" id="plate" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label for="year_of_make" class="form-label">Year</label>
+      <input type="number" name="year_of_make" id="year_of_make" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label for="seats" class="form-label">Seats</label>
+      <input type="number" name="seats" id="seats" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label for="fuel_type" class="form-label">Fuel Type</label>
+      <select name="fuel_type" id="fuel_type" class="form-select" required>
+        <option value="">-- Select --</option>
+        <option value="Petrol">Petrol</option>
+        <option value="Diesel">Diesel</option>
+        <option value="Electric">Electric</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label for="avg_consumption" class="form-label">Avg. Consumption (€/100km)</label>
+      <input type="number" step="0.1" name="avg_consumption" id="avg_consumption" class="form-control" required>
+    </div>
+
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">Add Car</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
