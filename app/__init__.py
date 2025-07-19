@@ -1,13 +1,10 @@
+#app/__init__.py
 from flask import Flask
 from flask_login import LoginManager
 from dotenv import load_dotenv
-from app.models import db, User  # db defined in models.py
-from flask_migrate import Migrate
-from app.routes import admin, trips, cars, proxy, users  # Import admin blueprint
-
+from app.extensions import db, migrate  # Import from extensions
 
 login_manager = LoginManager()
-migrate = Migrate()
 
 def create_app():
     load_dotenv()
@@ -18,13 +15,15 @@ def create_app():
     migrate.init_app(app, db)
 
     login_manager.init_app(app)
-    login_manager.login_view = 'main.login'  # redirect route for @login_required
+    login_manager.login_view = 'main.login'
+
+    from app.models import User  # import *after* db init
 
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
 
-    from .routes import main, users, trips
+    from app.routes import main, users, trips, admin, cars, proxy
     app.register_blueprint(main.bp)
     app.register_blueprint(users.bp)
     app.register_blueprint(trips.bp)
@@ -33,5 +32,3 @@ def create_app():
     app.register_blueprint(proxy.bp)
 
     return app
-
-

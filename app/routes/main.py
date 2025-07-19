@@ -4,7 +4,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import login_user, logout_user, login_required
 from app.models import User
 from app import db
-
+from app.notifications import notify_user,notify_driver
+from flask import current_app
+from flask_login import current_user
+from app.models import Trip, JoinRequest
 
 bp = Blueprint('main', __name__)
 
@@ -69,3 +72,7 @@ def logout():
     flash('You have been logged out.')
     return redirect(url_for('main.index'))
 
+@bp.before_app_request
+def run_notifications():
+    notify_driver()
+    notify_user()

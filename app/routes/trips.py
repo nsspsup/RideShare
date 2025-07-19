@@ -2,7 +2,7 @@ from flask import Blueprint
 from flask import render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app import db
-from app.models import Trip, Car
+from app.models import Trip, Car, JoinRequest
 from app.utils.geo import haversine, geocode_address
 import requests
 from datetime import datetime
@@ -29,11 +29,11 @@ def plan_trip():
     if request.method == 'POST':
 
         # Inside your plan_trip POST logic
-        user_cars = Car.query.filter_by(user_id=current_user.id).all()
+        car_id = request.form.get('car_id')
 
-        if not user_cars:
-            flash("You must add at least one car before planning a trip.", "warning")
-            return redirect(url_for('main.profile'))
+        if not current_user.cars:
+            flash("You need to add a car before planning a trip.", "warning")
+            return redirect(url_for('cars.manage_cars'))
 
         start = request.form.get('start_location')
         end = request.form.get('end_location')
@@ -82,7 +82,7 @@ def plan_trip():
         flash("Trip created successfully.")
         return redirect(url_for('trips.plan_trip'))
 
-    return render_template('trip_plan.html')
+    return render_template('trip_plan.html', cars=current_user.cars)
 
 
 @bp.route('/search', methods=['GET', 'POST'])
@@ -92,7 +92,13 @@ def search_trip():
     if request.method == 'POST':
         start_query = request.form.get('start_location')
         end_query = request.form.get('end_location')
-        max_km = float(request.form.get('radius') or 20)  # default to 20 km
+        max_km = float(request.form.get('radius') or 20)
+        show_all = request.form.get('show_all') == 'on'# default to 20 km
+
+        if show_all:
+            results = Trip.query.all()
+            flash(f"Showing all {len(results)} trips.")
+            return render_template('trip_search.html', results=results)
 
         # Simulated geocode lookup
         user_start_lat, user_start_lng = geocode_address(start_query)
@@ -131,3 +137,45 @@ def delete_trip(trip_id):
         flash("Unauthorized to delete this trip.", "danger")
 
     return redirect(url_for('trips.plan_trip'))
+
+@bp.route('/join/<int:trip_id>', methods=['POST'])
+@login_required
+def join_trip(trip_id):
+    trip = Trip.query.get_or_404(trip_id)
+
+    existing = JoinRequest.query.filter_by(trip_id=trip_id, user_id=current_user.id).first()
+    if existing:
+        flash("You already requested to join this trip.", "warning")
+        return redirect(url_for('trips.search_trip'))
+
+    req = JoinRequest(trip_id=trip.id, user_id=current_user.id)
+    db.session.add(req)
+    db.session.commit()
+    flash(f"Join request sent for trip ID {trip.id}.", "success")
+    return redirect(url_for('trips.search_trip'))
+
+@bp.route('/approve_request/<int:request_id>', methods=['POST'])
+@login_required
+def approve_request(request_id):
+    req = JoinRequest.query.get_or_404(request_id)
+    if req.trip.driver_id != current_user.id:
+        flash("Unauthorized.", "danger")
+        return redirect(url_for('main.profile'))
+
+    req.status = 'approved'
+    db.session.commit()
+    flash("Join request approved.", "success")
+    return redirect(url_for('main.profile'))
+
+@bp.route('/deny_request/<int:request_id>', methods=['POST'])
+@login_required
+def deny_request(request_id):
+    req = JoinRequest.query.get_or_404(request_id)
+    if req.trip.driver_id != current_user.id:
+        flash("Unauthorized.", "danger")
+        return redirect(url_for('main.profile'))
+
+    req.status = 'denied'
+    db.session.commit()
+    flash("Join request denied.", "warning")
+    return redirect(url_for('main.profile'))

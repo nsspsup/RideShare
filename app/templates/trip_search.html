@@ -3,26 +3,29 @@
 <div class="container mt-4">
   <h2 class="mb-4">Search for a Trip</h2>
 
-  <form method="POST" class="row g-3">
-    <div class="col-md-4">
-      <label for="start_location" class="form-label">Start Location</label>
-      <input type="text" class="form-control" name="start_location" id="start_location" required>
-    </div>
+ <form method="POST">
+  <div class="col-md-6 location-field">
+    <label for="start_location" class="form-label">Start Location</label>
+    <input type="text" class="form-control" name="start_location" id="start_location">
+  </div>
 
-    <div class="col-md-4">
-      <label for="end_location" class="form-label">End Location</label>
-      <input type="text" class="form-control" name="end_location" id="end_location" required>
-    </div>
+  <div class="col-md-6 location-field">
+    <label for="end_location" class="form-label">End Location</label>
+    <input type="text" class="form-control" name="end_location" id="end_location">
+  </div>
 
-    <div class="col-md-4">
-      <label for="radius" class="form-label">Max Distance (km)</label>
-      <input type="number" class="form-control" name="radius" id="radius" value="20" min="1">
-    </div>
+  <div class="col-md-6 location-field">
+    <label for="radius" class="form-label">Search Radius (km)</label>
+    <input type="number" class="form-control" name="radius" id="radius" value="20">
+  </div>
 
-    <div class="col-12">
-      <button type="submit" class="btn btn-primary">Search</button>
-    </div>
-  </form>
+  <div class="form-check mb-3">
+    <input class="form-check-input" type="checkbox" name="show_all" id="show_all">
+    <label class="form-check-label" for="show_all">Show all available trips</label>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Search</button>
+</form>
 
   {% if results %}
     <h3 class="mt-5">Matched Trips</h3>
@@ -85,5 +88,22 @@
   if (bounds.isValid()) {
     map.fitBounds(bounds, { padding: [50, 50] });
   }
+</script>
+
+<script>
+  const showAllCheckbox = document.getElementById("show_all");
+  const locationFields = document.querySelectorAll(".location-field");
+
+  function toggleLocationFields() {
+    const hide = showAllCheckbox.checked;
+    locationFields.forEach(field => {
+      field.style.display = hide ? "none" : "block";
+    });
+  }
+
+  showAllCheckbox.addEventListener("change", toggleLocationFields);
+
+  // Run on page load
+  toggleLocationFields();
 </script>
 {% endblock %}

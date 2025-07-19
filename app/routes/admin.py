@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash
 from flask_login import login_required
 from app.models import User, Trip, Car
 from app.utils.decorators import admin_required
+from app import db
 
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -20,9 +21,14 @@ def dashboard():
 @admin_required
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
+
+    if user.is_admin:
+        flash("Cannot delete an admin user.", "danger")
+        return redirect(url_for('admin.dashboard'))
+
     db.session.delete(user)
     db.session.commit()
-    flash(f"User {user.email} deleted.", "warning")
+    flash(f"User {user.email} deleted successfully.", "success")
     return redirect(url_for('admin.dashboard'))
 
 @bp.route('/delete_trip/<int:trip_id>', methods=['POST'])

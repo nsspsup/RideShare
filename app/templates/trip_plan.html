@@ -4,6 +4,15 @@
   <h2 class="mb-4">Plan a Trip</h2>
 
   <form id="tripForm" method="POST" class="row g-3">
+      <div class="col-md-6">
+          <label for="car_id" class="form-label">Select Car</label>
+              <select class="form-select" id="car_id" name="car_id" required>
+                {% for car in cars %}
+                  <option value="{{ car.id }}">{{ car.make }} {{ car.model }} ({{ car.plate }})</option>
+                {% endfor %}
+              </select>
+      </div>
+
     <div class="col-md-6">
       <label for="departure_time" class="form-label">Departure Time</label>
       <input type="datetime-local" name="departure_time" id="departure_time" class="form-control" required>
