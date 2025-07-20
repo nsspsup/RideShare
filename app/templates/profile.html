@@ -22,73 +22,6 @@
 
   <a href="{{ url_for('cars.manage_cars') }}" class="btn btn-outline-success mb-4">Manage My Cars</a>
 
-{% if current_user.is_authenticated %}
-
-  <!-- DRIVER SECTION: Requests to your trips -->
-  {% if current_user.trips %}
-    <h4 class="mt-5">Pending Join Requests for Your Trips</h4>
-    <ul class="list-group mb-4">
-      {% for trip in current_user.trips %}
-        {% for request in trip.join_requests %}
-          {% if request.status == 'pending' %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              <div>
-                <strong>{{ request.passenger.first_name }} {{ request.passenger.last_name }}</strong> wants to join your trip:
-                <br>
-                <em>{{ trip.start_location }} → {{ trip.end_location }}</em>
-                <br>
-                <small>{{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</small>
-              </div>
-              <div>
-                <form method="POST" action="{{ url_for('trips.approve_request', request_id=request.id) }}" style="display:inline;">
-                  <button class="btn btn-sm btn-success">Approve</button>
-                </form>
-                <form method="POST" action="{{ url_for('trips.deny_request', request_id=request.id) }}" style="display:inline;">
-                  <button class="btn btn-sm btn-danger">Deny</button>
-                </form>
-              </div>
-            </li>
-          {% endif %}
-        {% endfor %}
-      {% endfor %}
-    </ul>
-  {% endif %}
-
-  <!-- PASSENGER SECTION: My Requests -->
-  {% if current_user.join_requests %}
-    <h4>Your Join Requests</h4>
-    <table class="table table-bordered">
-      <thead>
-        <tr>
-          <th>Trip</th>
-          <th>Driver</th>
-          <th>Departure</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for req in current_user.join_requests %}
-          <tr>
-            <td>{{ req.trip.start_location }} → {{ req.trip.end_location }}</td>
-            <td>{{ req.trip.driver.first_name }} {{ req.trip.driver.last_name }}</td>
-            <td>{{ req.trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</td>
-            <td>
-              {% if req.status == 'pending' %}
-                <span class="badge bg-warning text-dark">Pending</span>
-              {% elif req.status == 'approved' %}
-                <span class="badge bg-success">Approved</span>
-              {% elif req.status == 'denied' %}
-                <span class="badge bg-danger">Denied</span>
-              {% endif %}
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% endif %}
-
-{% endif %}
-
 
   <hr>
 
@@ -115,63 +48,7 @@
   </form>
 </div>
 
-{% if current_user.is_authenticated and current_user.trips %}
-  <h4>Pending Join Requests for Your Trips</h4>
-  <ul class="list-group mb-4">
-    {% for trip in current_user.trips %}
-      {% for request in trip.join_requests %}
-        {% if request.status == 'pending' %}
-          <li class="list-group-item d-flex justify-content-between">
-            <div>
-              <strong>{{ request.passenger.first_name }} {{ request.passenger.last_name }}</strong> wants to join your trip:
-              {{ trip.start_location }} → {{ trip.end_location }} ({{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }})
-            </div>
-            <div>
-              <form method="POST" action="{{ url_for('trips.approve_request', request_id=request.id) }}" style="display:inline;">
-                <button class="btn btn-sm btn-success">Approve</button>
-              </form>
-              <form method="POST" action="{{ url_for('trips.deny_request', request_id=request.id) }}" style="display:inline;">
-                <button class="btn btn-sm btn-danger">Deny</button>
-              </form>
-            </div>
-          </li>
-        {% endif %}
-      {% endfor %}
-    {% endfor %}
-  </ul>
-{% endif %}
 
-{% if current_user.join_requests %}
-  <h4>Your Join Requests</h4>
-  <table class="table table-bordered">
-    <thead>
-      <tr>
-        <th>Trip</th>
-        <th>Driver</th>
-        <th>Departure</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for req in current_user.join_requests %}
-        <tr>
-          <td>{{ req.trip.start_location }} → {{ req.trip.end_location }}</td>
-          <td>{{ req.trip.driver.first_name }} {{ req.trip.driver.last_name }}</td>
-          <td>{{ req.trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</td>
-          <td>
-            {% if req.status == 'pending' %}
-              <span class="badge bg-warning text-dark">Pending</span>
-            {% elif req.status == 'approved' %}
-              <span class="badge bg-success">Approved</span>
-            {% elif req.status == 'denied' %}
-              <span class="badge bg-danger">Denied</span>
-            {% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% endif %}
 
 
 {% endblock %}

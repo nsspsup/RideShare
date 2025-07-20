@@ -40,9 +40,9 @@
               Cost Split: {{ trip.cost_split }}
             </small>
           </div>
-          <button class="btn btn-sm btn-outline-success" onclick="alert('Join request sent for trip ID {{ trip.id }}');">
-            Join
-          </button>
+          <a href="{{ url_for('trips.view_trip', trip_id=trip.id) }}" class="btn btn-sm btn-outline-success">
+            View & Join
+          </a>
         </li>
       {% endfor %}
     </ul>

@@ -1,10 +1,12 @@
 from flask import Blueprint
-from flask import render_template, request, redirect, url_for, flash
+from flask import render_template, request, redirect, url_for, flash, abort, json
 from flask_login import login_required, current_user
 from app import db
 from app.models import Trip, Car, JoinRequest
 from app.utils.geo import haversine, geocode_address
 import requests
+import os
+import config
 from datetime import datetime
 
 
@@ -50,7 +52,9 @@ def plan_trip():
         end_lat, end_lng = geocode_address(end)
 
         # Fetch route geometry from OSRM
-        osrm_url = f"https://router.project-osrm.org/route/v1/driving/{start_lng},{start_lat};{end_lng},{end_lat}?overview=full&geometries=geojson"
+        OSRM_URL = os.getenv("OSRM_URL")
+        osrm_url = f"{OSRM_URL}/route/v1/driving/{start_lng},{start_lat};{end_lng},{end_lat}?overview=full&geometries=geojson"
+        #osrm_url = f"http://158.220.118.95:5001/route/v1/driving/{start_lng},{start_lat};{end_lng},{end_lat}?overview=full&geometries=geojson"
         route_geometry = None
         try:
             res = requests.get(osrm_url)
@@ -93,7 +97,7 @@ def search_trip():
         start_query = request.form.get('start_location')
         end_query = request.form.get('end_location')
         max_km = float(request.form.get('radius') or 20)
-        show_all = request.form.get('show_all') == 'on'# default to 20 km
+        show_all = request.form.get('show_all') == 'on'  # default to 20 km
 
         if show_all:
             results = Trip.query.all()
@@ -124,6 +128,7 @@ def search_trip():
     return render_template('trip_search.html', results=results)
 
 
+
 @bp.route('/delete/<int:trip_id>', methods=['POST'])
 @login_required
 def delete_trip(trip_id):
@@ -143,39 +148,50 @@ def delete_trip(trip_id):
 def join_trip(trip_id):
     trip = Trip.query.get_or_404(trip_id)
 
-    existing = JoinRequest.query.filter_by(trip_id=trip_id, user_id=current_user.id).first()
+    # Prevent duplicate join
+    existing = JoinRequest.query.filter_by(trip_id=trip.id, passenger_id=current_user.id).first()
     if existing:
-        flash("You already requested to join this trip.", "warning")
+        flash("You have already requested to join this trip.", "warning")
         return redirect(url_for('trips.search_trip'))
 
-    req = JoinRequest(trip_id=trip.id, user_id=current_user.id)
-    db.session.add(req)
+    # Create join request
+    join_request = JoinRequest(
+        trip_id=trip.id,
+        passenger_id=current_user.id
+    )
+    db.session.add(join_request)
     db.session.commit()
-    flash(f"Join request sent for trip ID {trip.id}.", "success")
-    return redirect(url_for('trips.search_trip'))
+    flash("Join request sent to the trip owner.", "success")
 
-@bp.route('/approve_request/<int:request_id>', methods=['POST'])
+    return redirect(url_for('trips.view_trip', trip_id=trip.id))
+
+@bp.route('/approve_request/<int:req_id>', methods=['POST'])
 @login_required
-def approve_request(request_id):
-    req = JoinRequest.query.get_or_404(request_id)
-    if req.trip.driver_id != current_user.id:
-        flash("Unauthorized.", "danger")
-        return redirect(url_for('main.profile'))
+def approve_request(req_id):
+    join_request = JoinRequest.query.get_or_404(req_id)
 
-    req.status = 'approved'
+    if join_request.trip.driver_id != current_user.id:
+        abort(403)
+
+    action = request.form.get('action')
+    if action == 'accept':
+        join_request.status = 'accepted'
+    elif action == 'deny':
+        join_request.status = 'denied'
+
+    join_request.notified = False
     db.session.commit()
-    flash("Join request approved.", "success")
-    return redirect(url_for('main.profile'))
+    return redirect(url_for('users.my_trips'))
 
-@bp.route('/deny_request/<int:request_id>', methods=['POST'])
+
+@bp.route('/trips/<int:trip_id>')
 @login_required
-def deny_request(request_id):
-    req = JoinRequest.query.get_or_404(request_id)
-    if req.trip.driver_id != current_user.id:
-        flash("Unauthorized.", "danger")
-        return redirect(url_for('main.profile'))
+def view_trip(trip_id):
+    trip = Trip.query.get_or_404(trip_id)
 
-    req.status = 'denied'
-    db.session.commit()
-    flash("Join request denied.", "warning")
-    return redirect(url_for('main.profile'))
+    route_geojson = trip.route_geometry
+    if isinstance(route_geojson, str):
+        route_geojson = json.loads(route_geojson)
+
+    return render_template('trip_detail.html', trip=trip, route_geojson=route_geojson)
+

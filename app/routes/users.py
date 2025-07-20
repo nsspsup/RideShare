@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from app import db
-from app.models import User
+from app.models import User, JoinRequest, Trip
 
 bp = Blueprint('users', __name__, url_prefix='/users')
 
@@ -20,7 +20,12 @@ def profile():
         flash("Profile updated successfully!")
         return redirect(url_for('users.profile'))
 
-    return render_template('profile.html', user=current_user)
+    notifications = JoinRequest.query.filter_by(passenger_id=current_user.id, notified=False).all()
+    for req in notifications:
+        req.notified = True
+    db.session.commit()
+
+    return render_template('profile.html', user=current_user, notifications=notifications)
 
 @bp.route('/change-password', methods=['POST'])
 @login_required
@@ -54,3 +59,23 @@ def delete_profile():
 
     flash("Your profile has been deleted.", "warning")
     return redirect(url_for('main.index'))
+
+@bp.route('/my-trips')
+@login_required
+def my_trips():
+    created_trips = current_user.trips
+    joined_requests = current_user.join_requests
+    joined_trips = [req.trip for req in joined_requests if req.status == 'accepted']
+    pending_requests = [req for req in joined_requests if req.status == 'pending']
+
+    # New: Get join requests on trips the current user created (driver)
+    driver_pending_requests = JoinRequest.query.join(Trip).filter(
+        Trip.driver_id == current_user.id,
+        JoinRequest.status == 'pending'
+    ).all()
+
+    return render_template('my_trips.html',
+                           created_trips=created_trips,
+                           joined_trips=joined_trips,
+                           pending_requests=pending_requests,
+                           driver_pending_requests=driver_pending_requests)

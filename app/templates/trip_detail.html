@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Trip Details</h2>
+
+  <p><strong>From:</strong> {{ trip.start_location }}</p>
+  <p><strong>To:</strong> {{ trip.end_location }}</p>
+  <p><strong>Departure:</strong> {{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</p>
+  <p><strong>Seats:</strong> {{ trip.available_seats }}</p>
+  <p><strong>Driver:</strong> {{ trip.driver.full_name() }}</p>
+
+  {% if trip.car %}
+    <p><strong>Car:</strong> {{ trip.car.make }} {{ trip.car.model }} ({{ trip.car.plate }})</p>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('trips.join_trip', trip_id=trip.id) }}">
+    <button type="submit" class="btn btn-primary">Join Trip</button>
+  </form>
+
+  <div id="map" class="mt-4 mb-5" style="height: 500px;"></div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+<script>
+  const map = L.map('map').setView([48.15, 17.11], 7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  const bounds = L.latLngBounds();
+
+  {% if route_geojson %}
+    const geojson = {{ route_geojson | safe }};
+    const route = L.geoJSON(geojson, {
+      style: { color: 'green', weight: 5, opacity: 0.8 }
+    }).addTo(map);
+
+    bounds.extend(route.getBounds());
+
+    const coords = geojson.coordinates;
+    if (coords.length >= 2) {
+      const start = [coords[0][1], coords[0][0]];
+      const end = [coords[coords.length - 1][1], coords[coords.length - 1][0]];
+      L.marker(start).addTo(map).bindPopup("Start: {{ trip.start_location }}");
+      L.marker(end).addTo(map).bindPopup("End: {{ trip.end_location }}");
+    }
+  {% endif %}
+
+  if (bounds.isValid()) {
+    map.fitBounds(bounds, { padding: [50, 50] });
+  }
+</script>
+{% endblock %}
