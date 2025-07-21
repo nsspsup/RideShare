@@ -113,7 +113,7 @@ def delete_trip(trip_id):
     if trip.driver_id != current_user.id:
         abort(403)
     db.session.delete(trip); db.session.commit()
-    flash("Deleted trip.")
+    flash("Trip was deleted !", "success")
     return redirect(url_for('trips.plan_trip'))
 
 
@@ -121,6 +121,10 @@ def delete_trip(trip_id):
 @login_required
 def join_trip(trip_id):
     trip = Trip.query.get_or_404(trip_id)
+    if trip.driver_id == current_user.id:
+        flash("You cannot join your own trip.", "warning")
+        return redirect(url_for('trips.view_trip', trip_id=trip_id))
+
     if JoinRequest.query.filter_by(trip_id=trip.id, passenger_id=current_user.id).first():
         flash("Already requested.", "warning")
     else:
@@ -128,6 +132,7 @@ def join_trip(trip_id):
         db.session.add(jr); db.session.commit()
         flash("Requested to join.", "success")
     return redirect(url_for('trips.view_trip', trip_id=trip_id))
+    flash("Passenger joined successfully!", "success")
 
 
 
@@ -147,17 +152,18 @@ def approve_request(req_id):
     if jr.trip.driver_id != current_user.id:
         abort(403)
 
-    if request.form['action'] == 'accept':
+    action = request.form.get('action')
+    if action == 'accept':
         jr.status = 'accepted'
-    elif request.form['action'] == 'deny':
+        jr.trip.update_cost_per_person()
+        db.session.commit()
+        flash(f"{jr.passenger.full_name} approved for the trip.", "success")
+    elif action == 'deny':
         jr.status = 'rejected'
-    else:
-        abort(400)
+        jr.trip.update_cost_per_person()
+        db.session.commit()
+        flash(f"Request from {jr.passenger.full_name} denied.", "info")
 
-    # 🔁 Recalculate per-person cost properly
-    jr.trip.update_cost_per_person()
-    db.session.commit()
-    flash("Request processed.", "success")
     return redirect(url_for('users.my_trips'))
 
 @bp.route('/withdraw_request/<int:req_id>', methods=['POST'])
@@ -171,5 +177,5 @@ def withdraw_request(req_id):
     db.session.delete(jr)
     #trip.update_cost_per_person()
     db.session.commit()
-    flash("Withdrawn.", "info")
+    flash("Passenger withdrawn sucessfully!", "success")
     return redirect(url_for('users.my_trips'))

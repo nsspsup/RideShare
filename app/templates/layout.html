@@ -9,6 +9,12 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- ✅ Font Awesome CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-KocaEnwBxwG8DC8vL3YxZV6Gk3FTIu2H7KjUBq0NsXmbq8wv/c6ASu7z1a+u8cQyoOa3K/mftRJEd4UBo9ig1Q==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet"/>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
     <style>
         body {
             padding-bottom: 40px;
@@ -50,11 +56,6 @@
             <li class="nav-item">
                 <a href="{{ url_for('users.my_trips') }}" class="nav-link position-relative">
                     <i class="fas fa-user"></i>
-                    {% if show_notification %}
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                            !
-                        </span>
-                    {% endif %}
                 </a>
             </li>
             <li class="nav-item text-white ms-3">
@@ -90,6 +91,23 @@
 
 <!-- Bootstrap Bundle JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
+<script>
+  $(function(){
+    {% with messages = get_flashed_messages(with_categories=True) %}
+      {% for category, msg in messages %}
+        toastr.options = { "closeButton": true, "progressBar": true };
+        {% if category == 'success' %}
+          toastr.success("{{ msg }}");
+        {% elif category == 'error' or category == 'danger' %}
+          toastr.error("{{ msg }}");
+        {% elif category == 'warning' %}
+          toastr.warning("{{ msg }}");
+        {% else %}
+          toastr.info("{{ msg }}");
+        {% endif %}
+      {% endfor %}
+    {% endwith %}
+  });
+</script>
 </body>
 </html>

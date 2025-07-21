@@ -8,7 +8,7 @@
     <table class="table table-bordered table-striped">
       <thead class="table-light">
         <tr>
-          <th>Start</th><th>End</th><th>Departure</th><th>Actions</th>
+          <th>Start</th><th>End</th><th>Departure</th><th>Your Share</th><th>Passengers</th><th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -17,6 +17,19 @@
           <td>{{ trip.start_location }}</td>
           <td>{{ trip.end_location }}</td>
           <td>{{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>€{{ trip.cost_per_person | round(2) }}</td>
+          <td>
+            {% set accepted = trip.join_request | selectattr('status', 'equalto', 'accepted') | list %}
+            {% if accepted %}
+              <ul class="mb-0">
+                {% for jr in accepted %}
+                  <li>{{ jr.passenger.full_name() }} (<a href="mailto:{{ jr.passenger.email }}">email</a>)</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <span class="text-muted">none</span>
+            {% endif %}
+          </td>
           <td>
             <form action="{{ url_for('trips.delete_trip', trip_id=trip.id) }}" method="POST">
               <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this trip?')">Delete</button>
@@ -42,12 +55,10 @@
           <td>{{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</td>
           <td>
             {{ trip.driver.full_name() }}
-            {% for req in joined_requests %}
-              {% if req.trip_id == trip.id %}
-              <form action="{{ url_for('trips.withdraw_request', req_id=req.id) }}" method="POST" class="mt-2">
-                <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Withdraw?')">Withdraw</button>
-              </form>
-              {% endif %}
+            {% for req in joined_requests if req.trip_id == trip.id %}
+            <form action="{{ url_for('trips.withdraw_request', req_id=req.id) }}" method="POST" class="mt-2">
+              <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Withdraw?')">Withdraw</button>
+            </form>
             {% endfor %}
           </td>
         </tr>
@@ -88,18 +99,18 @@
           <td>{{ req.trip.start_location }}</td>
           <td>{{ req.trip.end_location }}</td>
           <td>{{ req.trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</td>
-            <td class="align-middle">
-              <div class="d-flex gap-2">
-                <form method="POST" action="{{ url_for('trips.approve_request', req_id=req.id) }}">
-                  <input type="hidden" name="action" value="accept">
-                  <button class="btn btn-sm btn-success">Accept</button>
-                </form>
-                <form method="POST" action="{{ url_for('trips.approve_request', req_id=req.id) }}">
-                  <input type="hidden" name="action" value="deny">
-                  <button class="btn btn-sm btn-danger">Deny</button>
-                </form>
-              </div>
-            </td>
+          <td class="align-middle">
+            <div class="d-flex gap-2">
+              <form method="POST" action="{{ url_for('trips.approve_request', req_id=req.id) }}">
+                <input type="hidden" name="action" value="accept">
+                <button class="btn btn-sm btn-success">Accept</button>
+              </form>
+              <form method="POST" action="{{ url_for('trips.approve_request', req_id=req.id) }}">
+                <input type="hidden" name="action" value="deny">
+                <button class="btn btn-sm btn-danger">Deny</button>
+              </form>
+            </div>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
