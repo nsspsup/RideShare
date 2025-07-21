@@ -3,29 +3,29 @@
 <div class="container mt-4">
   <h2 class="mb-4">Search for a Trip</h2>
 
- <form method="POST">
-  <div class="col-md-6 location-field">
-    <label for="start_location" class="form-label">Start Location</label>
-    <input type="text" class="form-control" name="start_location" id="start_location">
-  </div>
+    <form method="GET" action="{{ url_for('trips.search_trip') }}" class="row g-3 mb-3">
+      <div class="col-md-6 location-field" {% if show_all %}style="display:none"{% endif %}>
+        <label>Start Location</label>
+        <input type="text" name="start_location" class="form-control" value="{{ request.args.get('start_location','') }}">
+      </div>
+      <div class="col-md-6 location-field" {% if show_all %}style="display:none"{% endif %}>
+        <label>End Location</label>
+        <input type="text" name="end_location" class="form-control" value="{{ request.args.get('end_location','') }}">
+      </div>
+      <div class="col-md-6 location-field" {% if show_all %}style="display:none"{% endif %}>
+        <label>Radius (km)</label>
+        <input type="number" name="radius" class="form-control" value="{{ request.args.get('radius',20) }}">
+      </div>
 
-  <div class="col-md-6 location-field">
-    <label for="end_location" class="form-label">End Location</label>
-    <input type="text" class="form-control" name="end_location" id="end_location">
-  </div>
-
-  <div class="col-md-6 location-field">
-    <label for="radius" class="form-label">Search Radius (km)</label>
-    <input type="number" class="form-control" name="radius" id="radius" value="20">
-  </div>
-
-  <div class="form-check mb-3">
-    <input class="form-check-input" type="checkbox" name="show_all" id="show_all">
-    <label class="form-check-label" for="show_all">Show all available trips</label>
-  </div>
-
-  <button type="submit" class="btn btn-primary">Search</button>
-</form>
+      <div class="col-md-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Search</button>
+        <!-- Explicit GET parameter for "show_all" -->
+        <button type="submit" name="show_all" value="true"
+                class="btn {{ 'btn-secondary' if show_all else 'btn-outline-secondary' }}">
+          {{ 'Show Matching Only' if show_all else 'Show All Trips' }}
+        </button>
+      </div>
+    </form>
 
   {% if results %}
     <h3 class="mt-5">Matched Trips</h3>
@@ -50,60 +50,4 @@
 
   <div id="map" class="mt-4 mb-5" style="height: 500px;"></div>
 </div>
-
-<!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-
-<script>
-  const map = L.map('map').setView([48.15, 17.11], 7);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(map);
-
-  const bounds = L.latLngBounds();
-
-  {% for trip in results %}
-    {% if trip.route_geometry %}
-      const geojson = {{ trip.route_geometry|safe }};
-      const route = L.geoJSON(geojson, {
-        style: { color: 'blue', weight: 4, opacity: 0.7 }
-      }).addTo(map);
-
-      route.on('mouseover', () => route.setStyle({ color: 'orange', weight: 6 }));
-      route.on('mouseout', () => route.setStyle({ color: 'blue', weight: 4 }));
-
-      bounds.extend(route.getBounds());
-
-      const coords = geojson.coordinates;
-      if (coords.length >= 2) {
-        const start = [coords[0][1], coords[0][0]];
-        const end = [coords[coords.length - 1][1], coords[coords.length - 1][0]];
-        L.marker(start).addTo(map).bindPopup("Start: {{ trip.start_location }}");
-        L.marker(end).addTo(map).bindPopup("End: {{ trip.end_location }}");
-      }
-    {% endif %}
-  {% endfor %}
-
-  if (bounds.isValid()) {
-    map.fitBounds(bounds, { padding: [50, 50] });
-  }
-</script>
-
-<script>
-  const showAllCheckbox = document.getElementById("show_all");
-  const locationFields = document.querySelectorAll(".location-field");
-
-  function toggleLocationFields() {
-    const hide = showAllCheckbox.checked;
-    locationFields.forEach(field => {
-      field.style.display = hide ? "none" : "block";
-    });
-  }
-
-  showAllCheckbox.addEventListener("change", toggleLocationFields);
-
-  // Run on page load
-  toggleLocationFields();
-</script>
 {% endblock %}

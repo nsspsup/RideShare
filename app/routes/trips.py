@@ -1,5 +1,5 @@
 from flask import Blueprint
-from flask import render_template, request, redirect, url_for, flash, abort, json
+from flask import render_template, request, redirect, url_for, flash, abort, json , current_app
 from flask_login import login_required, current_user
 from app import db
 from app.models import Trip, Car, JoinRequest
@@ -8,8 +8,7 @@ import requests
 import os
 import config
 from datetime import datetime
-
-
+from sqlalchemy import not_
 
 
 bp = Blueprint('trips', __name__, url_prefix='/trips')
@@ -29,103 +28,81 @@ def fake_geocode(address):
 @login_required
 def plan_trip():
     if request.method == 'POST':
-
-        # Inside your plan_trip POST logic
-        car_id = request.form.get('car_id')
-
         if not current_user.cars:
-            flash("You need to add a car before planning a trip.", "warning")
+            flash("Add a car first.", "warning")
             return redirect(url_for('cars.manage_cars'))
 
-        start = request.form.get('start_location')
-        end = request.form.get('end_location')
-        seats = request.form.get('available_seats')
-        cost_split = request.form.get('cost_split')
-        allow_dev = request.form.get('allow_deviation') == 'yes'
-        max_deviation_km = request.form.get('max_deviation_km')
-        dep_time_str = request.form.get('departure_time')
-        departure_time = datetime.strptime(dep_time_str, "%Y-%m-%dT%H:%M") if dep_time_str else None
+        start = request.form['start_location']
+        end = request.form['end_location']
+        dep_time = datetime.strptime(request.form['departure_time'], "%Y-%m-%dT%H:%M")
 
-        # Geocode start and end to get lat/lng
-        from app.utils.geo import geocode_address
-        start_lat, start_lng = geocode_address(start)
-        end_lat, end_lng = geocode_address(end)
+        s_lat, s_lng = geocode_address(start)
+        e_lat, e_lng = geocode_address(end)
 
-        # Fetch route geometry from OSRM
-        OSRM_URL = os.getenv("OSRM_URL")
-        osrm_url = f"{OSRM_URL}/route/v1/driving/{start_lng},{start_lat};{end_lng},{end_lat}?overview=full&geometries=geojson"
-        #osrm_url = f"http://158.220.118.95:5001/route/v1/driving/{start_lng},{start_lat};{end_lng},{end_lat}?overview=full&geometries=geojson"
-        route_geometry = None
+        route_geo = None
+        if request.form.get('route_geometry'):
+            route_geo = json.loads(request.form['route_geometry'])
+
         try:
-            res = requests.get(osrm_url)
-            if res.status_code == 200:
-                data = res.json()
-                if data["routes"]:
-                    route_geometry = data["routes"][0]["geometry"]
-        except Exception as e:
-            print("Failed to fetch route from OSRM:", e)
+            route_distance_km = float(request.form.get('route_distance_km', 0))
+            cost_total = float(request.form.get('cost_total', 0))
+            cost_per_person = cost_total / 2 if cost_total is not None else None
+        except ValueError:
+            route_distance_km = cost_total = None
 
-        # Create trip
-        new_trip = Trip(
+
+        trip = Trip(
             driver_id=current_user.id,
-            start_location=start,
-            end_location=end,
-            start_lat=start_lat,
-            start_lng=start_lng,
-            end_lat=end_lat,
-            end_lng=end_lng,
-            available_seats=seats,
-            cost_split=cost_split,
-            max_deviation_km = float(max_deviation_km) if max_deviation_km else None,
-            route_geometry=route_geometry,
-            departure_time=departure_time,
+            start_location=start, end_location=end,
+            start_lat=s_lat, start_lng=s_lng,
+            end_lat=e_lat, end_lng=e_lng,
+            route_geometry=route_geo,
+            departure_time=dep_time,
+            car_id=current_user.cars[0].id,
+            route_distance_km=route_distance_km,
+            cost_total=cost_total,
+            cost_per_person=cost_per_person
         )
 
-        db.session.add(new_trip)
+        db.session.add(trip)
         db.session.commit()
-        flash("Trip created successfully.")
-        return redirect(url_for('trips.plan_trip'))
+        flash("Trip created!")
+        return redirect(url_for('trips.view_trip', trip_id=trip.id))
 
     return render_template('trip_plan.html', cars=current_user.cars)
 
 
-@bp.route('/search', methods=['GET', 'POST'])
+@bp.route('/search', methods=['GET'])
 def search_trip():
+    show_all = request.args.get('show_all') == 'true'
     results = []
 
-    if request.method == 'POST':
-        start_query = request.form.get('start_location')
-        end_query = request.form.get('end_location')
-        max_km = float(request.form.get('radius') or 20)
-        show_all = request.form.get('show_all') == 'on'  # default to 20 km
+    if show_all:
+        # exclude trips with an accepted passenger
+        results = Trip.query.filter(
+            ~Trip.join_request.any(JoinRequest.status == 'accepted')
+        ).all()
+    else:
+        # geocode and filter by radius
+        start = request.args.get('start_location', '').strip()
+        end = request.args.get('end_location', '').strip()
+        radius = float(request.args.get('radius', 20))
+        if start and end:
+            s_lat, s_lng = geocode_address(start)
+            e_lat, e_lng = geocode_address(end)
+            if s_lat and e_lat:
+                query = Trip.query.filter(
+                    ~Trip.join_requests.any(JoinRequest.status == 'accepted')
+                )
+                for trip in query.all():
+                    d1 = haversine(s_lat, s_lng, trip.start_lat, trip.start_lng)
+                    d2 = haversine(e_lat, e_lng, trip.end_lat, trip.end_lng)
+                    if d1 <= radius and d2 <= radius:
+                        results.append(trip)
+            else:
+                flash("Could not geocode inputs.", "danger")
 
-        if show_all:
-            results = Trip.query.all()
-            flash(f"Showing all {len(results)} trips.")
-            return render_template('trip_search.html', results=results)
-
-        # Simulated geocode lookup
-        user_start_lat, user_start_lng = geocode_address(start_query)
-        user_end_lat, user_end_lng = geocode_address(end_query)
-
-        if not user_start_lat or not user_end_lat:
-            flash("Could not geocode your search locations.")
-            return render_template('trip_search.html', results=[])
-
-        for trip in Trip.query.all():
-            if trip.start_lat is None or trip.end_lat is None:
-                continue
-
-            distance_start = haversine(user_start_lat, user_start_lng, trip.start_lat, trip.start_lng)
-            distance_end = haversine(user_end_lat, user_end_lng, trip.end_lat, trip.end_lng)
-
-            if distance_start <= max_km and distance_end <= max_km:
-                results.append(trip)
-
-        if not results:
-            flash("No trips found. Try broadening your search.")
-
-    return render_template('trip_search.html', results=results)
+    return render_template('trip_search.html', results=results, show_all=show_all)
 
 
 
@@ -133,65 +110,66 @@ def search_trip():
 @login_required
 def delete_trip(trip_id):
     trip = Trip.query.get_or_404(trip_id)
-
-    if current_user.id == trip.driver_id or getattr(current_user, 'is_admin', False):
-        db.session.delete(trip)
-        db.session.commit()
-        flash("Trip deleted.", "success")
-    else:
-        flash("Unauthorized to delete this trip.", "danger")
-
+    if trip.driver_id != current_user.id:
+        abort(403)
+    db.session.delete(trip); db.session.commit()
+    flash("Deleted trip.")
     return redirect(url_for('trips.plan_trip'))
+
 
 @bp.route('/join/<int:trip_id>', methods=['POST'])
 @login_required
 def join_trip(trip_id):
     trip = Trip.query.get_or_404(trip_id)
+    if JoinRequest.query.filter_by(trip_id=trip.id, passenger_id=current_user.id).first():
+        flash("Already requested.", "warning")
+    else:
+        jr = JoinRequest(trip_id=trip.id, passenger_id=current_user.id)
+        db.session.add(jr); db.session.commit()
+        flash("Requested to join.", "success")
+    return redirect(url_for('trips.view_trip', trip_id=trip_id))
 
-    # Prevent duplicate join
-    existing = JoinRequest.query.filter_by(trip_id=trip.id, passenger_id=current_user.id).first()
-    if existing:
-        flash("You have already requested to join this trip.", "warning")
-        return redirect(url_for('trips.search_trip'))
-
-    # Create join request
-    join_request = JoinRequest(
-        trip_id=trip.id,
-        passenger_id=current_user.id
-    )
-    db.session.add(join_request)
-    db.session.commit()
-    flash("Join request sent to the trip owner.", "success")
-
-    return redirect(url_for('trips.view_trip', trip_id=trip.id))
-
-@bp.route('/approve_request/<int:req_id>', methods=['POST'])
-@login_required
-def approve_request(req_id):
-    join_request = JoinRequest.query.get_or_404(req_id)
-
-    if join_request.trip.driver_id != current_user.id:
-        abort(403)
-
-    action = request.form.get('action')
-    if action == 'accept':
-        join_request.status = 'accepted'
-    elif action == 'deny':
-        join_request.status = 'denied'
-
-    join_request.notified = False
-    db.session.commit()
-    return redirect(url_for('users.my_trips'))
 
 
 @bp.route('/trips/<int:trip_id>')
 @login_required
 def view_trip(trip_id):
     trip = Trip.query.get_or_404(trip_id)
+    geo = trip.route_geometry
+    if isinstance(geo, str):
+        geo = json.loads(geo)
+    return render_template('trip_detail.html', trip=trip, route_geojson=geo)
 
-    route_geojson = trip.route_geometry
-    if isinstance(route_geojson, str):
-        route_geojson = json.loads(route_geojson)
+@bp.route('/approve_request/<int:req_id>', methods=['POST'])
+@login_required
+def approve_request(req_id):
+    jr = JoinRequest.query.get_or_404(req_id)
+    if jr.trip.driver_id != current_user.id:
+        abort(403)
 
-    return render_template('trip_detail.html', trip=trip, route_geojson=route_geojson)
+    if request.form['action'] == 'accept':
+        jr.status = 'accepted'
+    elif request.form['action'] == 'deny':
+        jr.status = 'rejected'
+    else:
+        abort(400)
 
+    # 🔁 Recalculate per-person cost properly
+    jr.trip.update_cost_per_person()
+    db.session.commit()
+    flash("Request processed.", "success")
+    return redirect(url_for('users.my_trips'))
+
+@bp.route('/withdraw_request/<int:req_id>', methods=['POST'])
+@login_required
+def withdraw_request(req_id):
+    jr = JoinRequest.query.get_or_404(req_id)
+    if jr.passenger_id != current_user.id:
+        abort(403)
+
+    trip = jr.trip
+    db.session.delete(jr)
+    #trip.update_cost_per_person()
+    db.session.commit()
+    flash("Withdrawn.", "info")
+    return redirect(url_for('users.my_trips'))

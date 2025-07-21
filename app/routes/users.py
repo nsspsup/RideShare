@@ -19,13 +19,7 @@ def profile():
         db.session.commit()
         flash("Profile updated successfully!")
         return redirect(url_for('users.profile'))
-
-    notifications = JoinRequest.query.filter_by(passenger_id=current_user.id, notified=False).all()
-    for req in notifications:
-        req.notified = True
-    db.session.commit()
-
-    return render_template('profile.html', user=current_user, notifications=notifications)
+    return render_template('profile.html', user=current_user)
 
 @bp.route('/change-password', methods=['POST'])
 @login_required
@@ -64,18 +58,21 @@ def delete_profile():
 @login_required
 def my_trips():
     created_trips = current_user.trips
-    joined_requests = current_user.join_requests
+    joined_requests = JoinRequest.query.filter_by(passenger_id=current_user.id).all()
+
     joined_trips = [req.trip for req in joined_requests if req.status == 'accepted']
     pending_requests = [req for req in joined_requests if req.status == 'pending']
 
-    # New: Get join requests on trips the current user created (driver)
-    driver_pending_requests = JoinRequest.query.join(Trip).filter(
-        Trip.driver_id == current_user.id,
-        JoinRequest.status == 'pending'
-    ).all()
+    driver_pending_requests = JoinRequest.query\
+        .join(Trip)\
+        .filter(Trip.driver_id == current_user.id, JoinRequest.status == 'pending')\
+        .all()
 
-    return render_template('my_trips.html',
-                           created_trips=created_trips,
-                           joined_trips=joined_trips,
-                           pending_requests=pending_requests,
-                           driver_pending_requests=driver_pending_requests)
+    return render_template(
+        'my_trips.html',
+        created_trips=created_trips,
+        joined_trips=joined_trips,
+        pending_requests=pending_requests,
+        driver_pending_requests=driver_pending_requests,
+        joined_requests=joined_requests  # pass if needed
+    )

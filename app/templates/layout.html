@@ -7,6 +7,8 @@
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- ✅ Font Awesome CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-KocaEnwBxwG8DC8vL3YxZV6Gk3FTIu2H7KjUBq0NsXmbq8wv/c6ASu7z1a+u8cQyoOa3K/mftRJEd4UBo9ig1Q==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         body {
             padding-bottom: 40px;
@@ -16,7 +18,7 @@
 <body>
 
 <!-- Responsive Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-success mb-4">
+<nav class="navbar navbar-expand-lg navbar-dark bg-success fixed-top">
   <div class="container-fluid">
     <a class="navbar-brand" href="{{ url_for('main.index') }}">Ride Share</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -46,11 +48,11 @@
         {% if current_user.is_authenticated %}
         <ul class="navbar-nav">
             <li class="nav-item">
-                <a href="{{ url_for('users.profile') }}" class="nav-link position-relative">
-                    <i class="fas fa-bell"></i>
+                <a href="{{ url_for('users.my_trips') }}" class="nav-link position-relative">
+                    <i class="fas fa-user"></i>
                     {% if show_notification %}
                         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                          !
+                            !
                         </span>
                     {% endif %}
                 </a>
@@ -88,7 +90,6 @@
 
 <!-- Bootstrap Bundle JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Font Awesome (for bell icon) -->
-<script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+
 </body>
 </html>

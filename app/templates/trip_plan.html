@@ -4,46 +4,34 @@
   <h2 class="mb-4">Plan a Trip</h2>
 
   <form id="tripForm" method="POST" class="row g-3">
-      <div class="col-md-6">
-          <label for="car_id" class="form-label">Select Car</label>
-              <select class="form-select" id="car_id" name="car_id" required>
-                {% for car in cars %}
-                  <option value="{{ car.id }}">{{ car.make }} {{ car.model }} ({{ car.plate }})</option>
-                {% endfor %}
-              </select>
-      </div>
-
+    <div class="col-md-6">
+      <label for="car_id" class="form-label">Select Car</label>
+      <select class="form-select" id="car_id" name="car_id" required>
+        {% for car in cars %}
+          <option value="{{ car.id }}" data-cost="{{ car.avg_consumption }}">
+            {{ car.make }} {{ car.model }} ({{ car.plate }})
+          </option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="col-md-6">
       <label for="departure_time" class="form-label">Departure Time</label>
-      <input type="datetime-local" name="departure_time" id="departure_time" class="form-control" required>
+      <input type="datetime-local" name="departure_time" class="form-control" required>
     </div>
-
     <div class="col-md-6">
       <label for="start_location" class="form-label">Start Location</label>
       <input type="text" id="start_location" name="start_location" class="form-control" required>
     </div>
-
     <div class="col-md-6">
       <label for="end_location" class="form-label">End Location</label>
       <input type="text" id="end_location" name="end_location" class="form-control" required>
     </div>
 
-    <div class="col-md-4">
-      <label for="available_seats" class="form-label">Available Seats</label>
-      <input type="number" name="available_seats" class="form-control" min="1" max="8" required>
-    </div>
-
-    <div class="col-md-4">
-      <label for="cost_split" class="form-label">Cost Split</label>
-      <input type="text" name="cost_split" class="form-control" placeholder="e.g., 50/50">
-    </div>
-
-    <div class="col-md-4">
-      <label for="max_deviation_km" class="form-label">Max Deviation (km)</label>
-      <input type="number" name="max_deviation_km" class="form-control">
-    </div>
-
-    <input type="hidden" id="route_geometry" name="route_geometry">
+    <!-- Hidden computed data -->
+    <input type="hidden" name="route_geometry" id="route_geometry">
+    <input type="hidden" name="route_distance_km" id="route_distance_km">
+    <input type="hidden" name="route_duration_minutes" id="route_duration_minutes">
+    <input type="hidden" name="cost_total" id="cost_total">
 
     <div class="col-12">
       <button type="submit" class="btn btn-success">Submit Trip</button>
@@ -51,113 +39,102 @@
     </div>
   </form>
 
-  <div id="map" class="mt-4 mb-5" style="height: 500px;"></div>
+  <div id="map" class="mt-4 mb-3" style="height: 500px;"></div>
+  <div id="route_info" class="text-muted mb-4"></div>
 
   <hr class="my-4">
-
   <h2>Your Planned Trips</h2>
   {% if current_user.trips %}
     <ul class="list-group mb-4">
-      {% for trip in current_user.trips %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <div>
-            <strong>{{ trip.start_location }}</strong> → <strong>{{ trip.end_location }}</strong><br>
-            <small class="text-muted">Departure: {{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</small>
-          </div>
-          {% if current_user.id == trip.driver_id or current_user.is_admin %}
-          <form action="{{ url_for('trips.delete_trip', trip_id=trip.id) }}" method="POST" class="ms-3">
-            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this trip?');">Delete</button>
-          </form>
-          {% endif %}
-        </li>
-      {% endfor %}
+    {% for trip in current_user.trips %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+          <strong>{{ trip.start_location }}</strong> → <strong>{{ trip.end_location }}</strong><br>
+          <small class="text-muted">Departure: {{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</small>
+        </div>
+        {% if current_user.id == trip.driver_id or current_user.is_admin %}
+        <form action="{{ url_for('trips.delete_trip', trip_id=trip.id) }}" method="POST">
+          <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+        </form>
+        {% endif %}
+      </li>
+    {% endfor %}
     </ul>
   {% else %}
     <p class="text-muted">You haven’t planned any trips yet.</p>
   {% endif %}
 </div>
 
-<!-- Leaflet CSS/JS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-
 <script>
-let map = L.map('map').setView([48.15, 17.11], 7);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap contributors'
-}).addTo(map);
+let map = L.map('map').setView([48.15,17.11],7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OSM contributors' }).addTo(map);
 
-let routeLayers = [];
-let selectedRouteLayer = null;
+let routeLayers=[], selectedRoute=null;
 
-async function geocode(query) {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
-  const response = await fetch(url, {
-    headers: { "User-Agent": "RideShareApp (email@example.com)" }
+async function geocode(query){
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`, {
+    headers:{ 'User-Agent': 'RideShareApp' }
   });
-  const data = await response.json();
-  return data.length > 0 ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
+  const arr = await res.json();
+  return arr[0] ? [parseFloat(arr[0].lat), parseFloat(arr[0].lon)] : null;
 }
 
-async function previewRoute() {
-  const startInput = document.getElementById('start_location').value;
-  const endInput = document.getElementById('end_location').value;
+async function previewRoute(){
+  const s = await geocode(document.getElementById('start_location').value);
+  const e = await geocode(document.getElementById('end_location').value);
+  if(!s||!e) return alert('Enter valid start and end.');
 
-  const startCoords = await geocode(startInput);
-  const endCoords = await geocode(endInput);
+  const resp = await fetch(`/proxy/osrm?start=${s[1]},${s[0]}&end=${e[1]},${e[0]}`);
+  const data = await resp.json();
+  if(data.code!=='Ok' || !data.routes?.length) return alert('No route found.');
 
-  if (!startCoords || !endCoords) {
-    alert("Could not geocode addresses.");
-    return;
-  }
+  routeLayers.forEach(l=>map.removeLayer(l));
+  routeLayers=[];
 
-  const url = `/proxy/osrm?start=${startCoords[1]},${startCoords[0]}&end=${endCoords[1]},${endCoords[0]}`;
-  console.log("Requesting route:", url);
+  data.routes.forEach((rt,i)=>{
+    const coords = rt.geometry.coordinates.map(c=>[c[1],c[0]]);
+    const layer = L.polyline(coords,{color:i?'orange':'blue',weight:i?4:5,opacity:i?0.6:1}).addTo(map);
+    routeLayers.push(layer);
+    layer.on('click', ()=> selectRoute(rt));
 
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
+    if(i===0) selectRoute(rt);
+  });
 
-    if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
-      alert("No route found.");
-      return;
-    }
-
-    // Clear previous routes
-    routeLayers.forEach(layer => map.removeLayer(layer));
-    routeLayers = [];
-
-    data.routes.forEach((route, index) => {
-      const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-      const layer = L.polyline(coords, {
-        color: index === 0 ? 'blue' : 'orange',
-        weight: index === 0 ? 5 : 4,
-        opacity: index === 0 ? 1.0 : 0.6
-      }).addTo(map);
-
-      if (index === 0) {
-        selectedRouteLayer = route;
-        document.getElementById('route_geometry').value = JSON.stringify(route.geometry);
-      }
-
-      layer.on('click', () => {
-        routeLayers.forEach(r => r.setStyle({ color: 'orange', weight: 4, opacity: 0.6 }));
-        layer.setStyle({ color: 'blue', weight: 5, opacity: 1.0 });
-        selectedRouteLayer = route;
-        document.getElementById('route_geometry').value = JSON.stringify(route.geometry);
-      });
-
-      routeLayers.push(layer);
-    });
-
-    const bounds = L.latLngBounds(routeLayers.flatMap(layer => layer.getLatLngs()));
-    map.fitBounds(bounds, { padding: [40, 40] });
-
-  } catch (error) {
-    console.error("Route preview failed:", error);
-    alert("Failed to fetch routes. Please try again.");
-  }
+  map.fitBounds(L.latLngBounds(routeLayers.flatMap(l=>l.getLatLngs())),{padding:[40,40]});
 }
 
+function selectRoute(rt, layer) {
+  selectedRoute = rt;
+  document.getElementById('route_geometry').value = JSON.stringify(rt.geometry);
+
+  const km = rt.distance / 1000;
+  const mins = Math.floor(rt.duration / 60);
+  const durationStr = mins;
+
+  const costPer100 = parseFloat(
+    document.querySelector('#car_id option:checked').dataset.cost
+  ) || 0;
+  const totalCost = (km / 100) * costPer100;
+   const shareCost = totalCost / 2;  // half
+
+  // Show human‑readable info
+  document.getElementById('route_info').textContent =
+    `Distance: ${km.toFixed(2)} km | Duration: ${durationStr} min | Cost: €${totalCost.toFixed(2)}`;
+
+  // Store hidden fields for form submission
+  document.getElementById('route_distance_km').value = km.toFixed(2);
+  document.getElementById('cost_total').value = totalCost.toFixed(2);
+  document.getElementById('cost_share').value = shareCost.toFixed(2);
+}
+
+// On form submit, ensure a route has been selected
+document.getElementById('tripForm').addEventListener('submit', function(e){
+  if(!selectedRoute){
+    e.preventDefault();
+    return alert('You must preview a route before submitting.');
+  }
+});
 </script>
 {% endblock %}

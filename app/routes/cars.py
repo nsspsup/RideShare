@@ -14,12 +14,11 @@ def manage_cars():
         make = request.form.get('car_make')  # previously request.form.get('make')
         model = request.form.get('model')
         plate = request.form.get('plate')
-        seats = request.form.get('seats')
         year_of_make = request.form.get('year_of_make')
         fuel_type = request.form.get('fuel_type')
         avg_consumption = request.form.get('avg_consumption')
 
-        if not all([make, model, plate, seats, year_of_make, fuel_type, avg_consumption]):
+        if not all([make, model, plate, year_of_make, fuel_type, avg_consumption]):
             flash("All fields are required.", "danger")
         else:
             new_car = Car(
@@ -27,7 +26,6 @@ def manage_cars():
                 make=make,
                 model=model,
                 plate=plate,
-                seats=int(seats),
                 year_of_make=int(year_of_make),
                 fuel_type=fuel_type,
                 avg_consumption=float(avg_consumption)
@@ -54,7 +52,6 @@ def edit_car(car_id):
         car.model = request.form.get('model')
         car.plate = request.form.get('plate')
         car.year_of_make = request.form.get('year_of_make')
-        car.seats = request.form.get('seats')
         car.fuel_type = request.form.get('fuel_type')
         car.avg_consumption = request.form.get('avg_consumption')
 

@@ -8,12 +8,7 @@
     <table class="table table-bordered table-striped">
       <thead class="table-light">
         <tr>
-          <th>Start</th>
-          <th>End</th>
-          <th>Departure</th>
-          <th>Available Seats</th>
-          <th>Car</th>
-          <th>Actions</th>
+          <th>Start</th><th>End</th><th>Departure</th><th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -22,11 +17,9 @@
           <td>{{ trip.start_location }}</td>
           <td>{{ trip.end_location }}</td>
           <td>{{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</td>
-          <td>{{ trip.available_seats }}</td>
-          <td>{{ trip.car.make ~ ' ' ~ trip.car.model if trip.car else 'N/A' }}</td>
           <td>
             <form action="{{ url_for('trips.delete_trip', trip_id=trip.id) }}" method="POST">
-              <button class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this trip?')">Delete</button>
+              <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this trip?')">Delete</button>
             </form>
           </td>
         </tr>
@@ -36,15 +29,10 @@
   {% endif %}
 
   {% if joined_trips %}
-    <h4 class="mt-5">Trips I'm Joining</h4>
+    <h4 class="mt-5">Trips I’m Joining</h4>
     <table class="table table-bordered table-striped">
       <thead class="table-light">
-        <tr>
-          <th>Start</th>
-          <th>End</th>
-          <th>Departure</th>
-          <th>Driver</th>
-        </tr>
+        <tr><th>Start</th><th>End</th><th>Departure</th><th>Driver / Withdraw</th></tr>
       </thead>
       <tbody>
         {% for trip in joined_trips %}
@@ -52,7 +40,16 @@
           <td>{{ trip.start_location }}</td>
           <td>{{ trip.end_location }}</td>
           <td>{{ trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</td>
-          <td>{{ trip.driver.full_name() }}</td>
+          <td>
+            {{ trip.driver.full_name() }}
+            {% for req in joined_requests %}
+              {% if req.trip_id == trip.id %}
+              <form action="{{ url_for('trips.withdraw_request', req_id=req.id) }}" method="POST" class="mt-2">
+                <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Withdraw?')">Withdraw</button>
+              </form>
+              {% endif %}
+            {% endfor %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -63,12 +60,7 @@
     <h4 class="mt-5">Pending Join Requests</h4>
     <table class="table table-bordered table-striped">
       <thead class="table-light">
-        <tr>
-          <th>Start</th>
-          <th>End</th>
-          <th>Departure</th>
-          <th>Status</th>
-        </tr>
+        <tr><th>Start</th><th>End</th><th>Departure</th><th>Status</th></tr>
       </thead>
       <tbody>
         {% for req in pending_requests %}
@@ -83,44 +75,39 @@
     </table>
   {% endif %}
 
-  {% if not created_trips and not joined_trips and not pending_requests %}
-        <p class="mt-4 text-muted">You currently have no trip activity.</p>
-      {% endif %}
-    {% if driver_pending_requests %}
-      <h4 class="mt-5">Join Requests for Your Trips</h4>
-      <table class="table table-bordered table-striped">
-        <thead class="table-light">
-          <tr>
-            <th>Passenger</th>
-            <th>From</th>
-            <th>To</th>
-            <th>Departure</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for req in driver_pending_requests %}
-          <tr>
-            <td>{{ req.passenger.full_name() }}</td>
-            <td>{{ req.trip.start_location }}</td>
-            <td>{{ req.trip.end_location }}</td>
-            <td>{{ req.trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</td>
-            <td>
-              <form method="POST" action="{{ url_for('trips.approve_request', req_id=req.id) }}" class="d-flex gap-1">
-                <input type="hidden" name="action" value="accept">
-                <button type="submit" class="btn btn-sm btn-success">Accept</button>
-              </form>
-              <form method="POST" action="{{ url_for('trips.approve_request', req_id=req.id) }}" class="d-flex gap-1 mt-1">
-                <input type="hidden" name="action" value="deny">
-                <button type="submit" class="btn btn-sm btn-danger">Deny</button>
-              </form>
+  {% if driver_pending_requests %}
+    <h4 class="mt-5">Join Requests for My Trips</h4>
+    <table class="table table-bordered table-striped">
+      <thead class="table-light">
+        <tr><th>Passenger</th><th>From</th><th>To</th><th>Departure</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for req in driver_pending_requests %}
+        <tr>
+          <td>{{ req.passenger.full_name() }}</td>
+          <td>{{ req.trip.start_location }}</td>
+          <td>{{ req.trip.end_location }}</td>
+          <td>{{ req.trip.departure_time.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td class="align-middle">
+              <div class="d-flex gap-2">
+                <form method="POST" action="{{ url_for('trips.approve_request', req_id=req.id) }}">
+                  <input type="hidden" name="action" value="accept">
+                  <button class="btn btn-sm btn-success">Accept</button>
+                </form>
+                <form method="POST" action="{{ url_for('trips.approve_request', req_id=req.id) }}">
+                  <input type="hidden" name="action" value="deny">
+                  <button class="btn btn-sm btn-danger">Deny</button>
+                </form>
+              </div>
             </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
 
-
+  {% if not created_trips and not joined_trips and not pending_requests and not driver_pending_requests %}
+    <p class="mt-4 text-muted">You have no trip activity.</p>
+  {% endif %}
 </div>
 {% endblock %}

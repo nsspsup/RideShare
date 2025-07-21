@@ -2,7 +2,7 @@
 from flask import Flask
 from flask_login import LoginManager, current_user
 from dotenv import load_dotenv
-from app.extensions import db, migrate  # Import from extensions
+from app.extensions import db  # Import from extensions
 
 login_manager = LoginManager()
 
@@ -12,7 +12,7 @@ def create_app():
     app.config.from_object('config.Config')
 
     db.init_app(app)
-    migrate.init_app(app, db)
+
 
     login_manager.init_app(app)
     login_manager.login_view = 'main.login'
@@ -27,7 +27,10 @@ def create_app():
     @app.context_processor
     def inject_notification_status():
         if current_user.is_authenticated:
-            show_notification = JoinRequest.query.filter_by(passenger_id=current_user.id, notified=False).count() > 0
+            show_notification = JoinRequest.query.filter_by(
+                passenger_id=current_user.id, notified=False
+            ).count() > 0
+            print("Notification badge:", show_notification)
         else:
             show_notification = False
         return dict(show_notification=show_notification)
