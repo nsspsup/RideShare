@@ -1,7 +1,7 @@
 # app/routes/proxy.py
 
 from flask import Blueprint, request, jsonify
-import requests
+import requests, os
 
 bp = Blueprint('proxy', __name__, url_prefix='/proxy')
 
@@ -13,7 +13,8 @@ def proxy_osrm():
     if not start or not end:
         return jsonify({'error': 'Missing start or end coordinates'}), 400
 
-    url = f"http://158.220.118.95:5001/route/v1/driving/{start};{end}?overview=full&geometries=geojson&alternatives=true"
+    osrm_base_url = os.getenv("OSRM_URL", "http://127.0.0.1:5001")
+    url = f"{osrm_base_url}/route/v1/driving/{start};{end}?overview=full&geometries=geojson&alternatives=true"
     print("Using OSRM:", url)
 
     try:
