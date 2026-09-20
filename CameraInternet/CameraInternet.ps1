@@ -1580,16 +1580,18 @@ function Start-CameraInternet {
     Write-Log -Message ('--- {0} starting (PowerShell {1}, {2}) ---' -f $script:AppName,
         $PSVersionTable.PSVersion.ToString(), [System.Environment]::OSVersion.VersionString)
 
-    # The console window must not sit behind the GUI. It is only hidden when
-    # the script was started with -File (never when typed into a console).
-    if (-not $KeepConsole -and [string]::IsNullOrEmpty($script:InvocationLine)) {
-        Hide-ConsoleWindow
-    }
-
+    # Icon export runs from the installer and shares that console window, so it
+    # must be handled before the console is hidden.
     if ($ExportIcon) {
         $path = Export-AppIcon -Path $ExportIcon
         Write-Log -Message "Icon exported to $path"
         return
+    }
+
+    # The console window must not sit behind the GUI. It is only hidden when
+    # the script was started with -File (never when typed into a console).
+    if (-not $KeepConsole -and [string]::IsNullOrEmpty($script:InvocationLine)) {
+        Hide-ConsoleWindow
     }
 
     $script:IsElevated = Test-Administrator

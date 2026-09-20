@@ -23,9 +23,11 @@ cameras need.
 
 | File | Purpose |
 | --- | --- |
+| `CameraInternet-Setup.cmd` | **Single-file installer** - contains everything, just run it. |
 | `CameraInternet.ps1` | The application (Windows PowerShell + WinForms). |
 | `Start-CameraInternet.cmd` | Launcher that starts the GUI with a hidden console. |
-| `Install-CameraInternet.ps1` | Optional: creates a "Camera Internet" desktop shortcut. |
+| `Install-CameraInternet.ps1` | Creates the "Camera Internet" shortcut when the folder is already on the PC. |
+| `Build-Setup.ps1` | Rebuilds `CameraInternet-Setup.cmd` from the files above. |
 | `README.md` | This file. |
 
 Nothing has to be installed: Windows 10 and Windows 11 already contain everything
@@ -33,19 +35,48 @@ Nothing has to be installed: Windows 10 and Windows 11 already contain everythin
 
 ## Installation
 
+### Option A - the single-file installer (recommended)
+
+Copy **`CameraInternet-Setup.cmd`** to the PC and double-click it. Nothing else is
+needed: the whole application is carried inside that one file.
+
+It unpacks the program to `%LOCALAPPDATA%\Programs\CameraInternet` and creates a
+**Camera Internet** shortcut on the desktop and in the Start menu, with a generated
+camera/network icon and the "run as administrator" flag set. Installing needs **no**
+administrator rights - the application asks for them itself when it starts. At the end it
+offers to start the program right away.
+
+To remove it again, run the same file with `/uninstall`:
+
+```
+CameraInternet-Setup.cmd /uninstall
+```
+
+That deletes the shortcuts and the program folder. The saved adapter selection and the
+log file in `%LOCALAPPDATA%\CameraInternet` are kept, and the ICS configuration itself is
+not touched - switch sharing off in the application before uninstalling if it is still
+active.
+
+If Windows SmartScreen shows "Windows protected your PC" for the downloaded file, choose
+*More info* -> *Run anyway*, or right-click the file, *Properties*, and tick *Unblock*.
+
+### Option B - run it from a folder
+
 1. Copy the whole folder anywhere on the PC, for example `C:\Tools\CameraInternet`.
-2. Optional, but recommended - create the desktop shortcut:
+2. Start the program with `Start-CameraInternet.cmd`, or create the desktop shortcut:
 
    ```
    powershell -ExecutionPolicy Bypass -File .\Install-CameraInternet.ps1
    ```
 
-   This creates a shortcut called **Camera Internet** on the desktop, with a generated
-   camera/network icon and the "run as administrator" flag set. Add `-StartMenu` to also
-   put it in the Start menu, or run the installer with `-Uninstall` to remove the
+   Add `-StartMenu` to also put it in the Start menu, or `-Uninstall` to remove the
    shortcuts again.
 
-3. Without the installer, start the program with `Start-CameraInternet.cmd`.
+After changing any of the source files, rebuild the single-file installer with:
+
+```
+powershell -ExecutionPolicy Bypass -File .\Build-Setup.ps1
+```
 
 ## Operation
 
@@ -145,7 +176,8 @@ Do this once on the workbench, with the cameras and the switch disconnected:
 1. Connect the PC's Wi-Fi to the phone hotspot and check that normal browsing works.
 2. Plug a **short Ethernet cable into any switch or into a spare laptop** - the Ethernet
    adapter must not be connected to the customer network during the test.
-3. Start `Start-CameraInternet.cmd` and confirm the UAC prompt.
+3. Start the program (desktop shortcut or `Start-CameraInternet.cmd`) and confirm the UAC
+   prompt.
 4. The button should be **red** with `INTERNET OFF`, and the line under it should show
    `Wi-Fi -> Ethernet`. If the wrong adapters are shown, fix them in `Settings`.
 5. Click the button. After a few seconds it should turn **green** with `INTERNET ON` and
@@ -184,7 +216,8 @@ Only after that, connect the camera switch.
 | "ICS service disabled" message | Answer *Yes* when asked to set the service to Manual, or enable *Internet Connection Sharing (ICS)* in `services.msc`. |
 | "Windows did not switch Internet sharing on" | Look at the log file. The usual causes are a disconnected hotspot, a disabled Ethernet adapter, or a third-party hotspot/VPN driver holding the ICS configuration. |
 | "Adapter not found / renamed" | Adapters are remembered by name. If Windows renamed one (`Ethernet` -> `Ethernet 2`), select it again in Settings. |
-| Nothing happens when starting | The UAC prompt was cancelled, or PowerShell script execution is blocked by policy. Use `Start-CameraInternet.cmd`, which sets `-ExecutionPolicy Bypass` for that one process only. |
+| Nothing happens when starting | The UAC prompt was cancelled, or PowerShell script execution is blocked by policy. Use `Start-CameraInternet.cmd` or the installed shortcut, which set `-ExecutionPolicy Bypass` for that one process only. |
+| Setup closes immediately / "damaged" | The `.cmd` was edited or truncated by a mail scanner. Copy the original file again (it must stay exactly as generated). |
 | Cameras get no address | Check that the cameras use DHCP, and that no second DHCP server (a router on the same switch) is connected to the camera network. |
 | Sharing survives a reboot | This is normal Windows behaviour: ICS is persistent. Start the utility and click the green button to switch it off. |
 
