@@ -72,6 +72,11 @@ $script:PendingAction     = 'Enable'
 $script:IsElevated        = $false
 $script:LastProbeTime     = [DateTime]::MinValue
 $script:LastProbeResult   = $null
+$script:SettingsAdapterNames = @()
+$script:SettingsInventory    = @()
+$script:SettingsDialog       = $null
+$script:SettingsCmbPublic    = $null
+$script:SettingsCmbPrivate   = $null
 
 # --------------------------------------------------------------------------
 # Logging / small helpers
@@ -1241,10 +1246,73 @@ function Invoke-Toggle {
     }
 }
 
+function Select-SettingsAdapter {
+    # Selects an adapter by name in one of the Settings drop-downs.
+    param($Combo, [string]$Name)
+    if ($null -eq $Combo -or [string]::IsNullOrWhiteSpace($Name)) { return }
+    for ($i = 0; $i -lt $script:SettingsAdapterNames.Count; $i++) {
+        if ($script:SettingsAdapterNames[$i] -eq $Name) {
+            $Combo.SelectedIndex = $i
+            return
+        }
+    }
+}
+
+function Invoke-SettingsAutoDetect {
+    try {
+        $auto = Get-AutoSelection -Inventory $script:SettingsInventory -Force
+        Select-SettingsAdapter -Combo $script:SettingsCmbPublic  -Name $auto.Public
+        Select-SettingsAdapter -Combo $script:SettingsCmbPrivate -Name $auto.Private
+    } catch {
+        Write-LogException -ErrorRecord $_ -Context 'Invoke-SettingsAutoDetect'
+        Show-ErrorMessage -Message 'The network adapters could not be detected automatically.'
+    }
+}
+
+function Save-SettingsSelection {
+    try {
+        $publicIndex  = $script:SettingsCmbPublic.SelectedIndex
+        $privateIndex = $script:SettingsCmbPrivate.SelectedIndex
+        if ($publicIndex -lt 0 -or $privateIndex -lt 0) {
+            Show-Warning -Message 'Please choose both an Internet adapter and a camera LAN adapter.'
+            return
+        }
+
+        $publicName  = [string]$script:SettingsAdapterNames[$publicIndex]
+        $privateName = [string]$script:SettingsAdapterNames[$privateIndex]
+        if ($publicName -eq $privateName) {
+            Show-Warning -Message 'The Internet adapter and the camera LAN adapter must be two different adapters.'
+            return
+        }
+
+        if (-not (Save-AppConfig -PublicAdapter $publicName -PrivateAdapter $privateName)) { return }
+
+        # Keep the in-memory configuration in step with the saved file. Rebuilt
+        # rather than assigned to, so a missing property can never throw here.
+        $script:Config = [pscustomobject]@{
+            PublicAdapter  = $publicName
+            PrivateAdapter = $privateName
+        }
+
+        if ($null -ne $script:SettingsDialog) {
+            $script:SettingsDialog.DialogResult = [System.Windows.Forms.DialogResult]::OK
+            $script:SettingsDialog.Close()
+        }
+    } catch {
+        Write-LogException -ErrorRecord $_ -Context 'Save-SettingsSelection'
+        Show-ErrorMessage -Message 'The adapter selection could not be applied.'
+    }
+}
+
 function Show-SettingsDialog {
     <#
         Manual adapter selection. The two drop-downs are filled from the live
         adapter list; the choice is stored in %LOCALAPPDATA%.
+
+        The button handlers below deliberately call script functions and use
+        script-scoped state only. A scriptblock closed with GetNewClosure()
+        runs in its own module scope, where $script: variables of this file
+        are not visible - that silently turned $script:Config into $null.
     #>
     $inventory = @(Get-AdapterInventory | Sort-Object -Property Name)
     if ($inventory.Count -eq 0) {
@@ -1294,30 +1362,33 @@ function Show-SettingsDialog {
         [void]$cmbPrivate.Items.Add($caption)
     }
 
-    $selectByName = {
-        param($combo, $name)
-        if ([string]::IsNullOrWhiteSpace($name)) { return }
-        for ($i = 0; $i -lt $names.Count; $i++) {
-            if ($names[$i] -eq $name) { $combo.SelectedIndex = $i; return }
-        }
+    # State the button handlers work with.
+    $script:SettingsAdapterNames = $names
+    $script:SettingsInventory    = $inventory
+    $script:SettingsDialog       = $dialog
+    $script:SettingsCmbPublic    = $cmbPublic
+    $script:SettingsCmbPrivate   = $cmbPrivate
+
+    $currentPublic  = $null
+    $currentPrivate = $null
+    if ($null -ne $script:CurrentState) {
+        $currentPublic  = $script:CurrentState.PublicName
+        $currentPrivate = $script:CurrentState.PrivateName
     }
-    & $selectByName $cmbPublic  $script:CurrentState.PublicName
-    & $selectByName $cmbPrivate $script:CurrentState.PrivateName
+    Select-SettingsAdapter -Combo $cmbPublic  -Name $currentPublic
+    Select-SettingsAdapter -Combo $cmbPrivate -Name $currentPrivate
 
     $btnAuto = New-Object System.Windows.Forms.Button
     $btnAuto.Text     = 'Auto-detect'
     $btnAuto.Location = New-Object System.Drawing.Point(12, 126)
     $btnAuto.Size     = New-Object System.Drawing.Size(96, 28)
-    $btnAuto.Add_Click({
-        $auto = Get-AutoSelection -Inventory $inventory -Force
-        & $selectByName $cmbPublic  $auto.Public
-        & $selectByName $cmbPrivate $auto.Private
-    }.GetNewClosure())
+    $btnAuto.Add_Click({ Invoke-SettingsAutoDetect })
 
     $btnOk = New-Object System.Windows.Forms.Button
     $btnOk.Text     = 'Save'
     $btnOk.Location = New-Object System.Drawing.Point(196, 126)
     $btnOk.Size     = New-Object System.Drawing.Size(84, 28)
+    $btnOk.Add_Click({ Save-SettingsSelection })
 
     $btnCancel = New-Object System.Windows.Forms.Button
     $btnCancel.Text         = 'Cancel'
@@ -1331,25 +1402,6 @@ function Show-SettingsDialog {
     $lblNote.Size      = New-Object System.Drawing.Size(360, 18)
     $lblNote.ForeColor = [System.Drawing.Color]::DimGray
 
-    $btnOk.Add_Click({
-        if ($cmbPublic.SelectedIndex -lt 0 -or $cmbPrivate.SelectedIndex -lt 0) {
-            Show-Warning -Message 'Please choose both an Internet adapter and a camera LAN adapter.'
-            return
-        }
-        $publicName  = $names[$cmbPublic.SelectedIndex]
-        $privateName = $names[$cmbPrivate.SelectedIndex]
-        if ($publicName -eq $privateName) {
-            Show-Warning -Message 'The Internet adapter and the camera LAN adapter must be two different adapters.'
-            return
-        }
-        if (Save-AppConfig -PublicAdapter $publicName -PrivateAdapter $privateName) {
-            $script:Config.PublicAdapter  = $publicName
-            $script:Config.PrivateAdapter = $privateName
-            $dialog.DialogResult = [System.Windows.Forms.DialogResult]::OK
-            $dialog.Close()
-        }
-    }.GetNewClosure())
-
     $dialog.Controls.AddRange(@($lblPublic, $cmbPublic, $lblPrivate, $cmbPrivate, $btnAuto, $btnOk, $btnCancel, $lblNote))
     $dialog.AcceptButton = $btnOk
     $dialog.CancelButton = $btnCancel
@@ -1358,6 +1410,11 @@ function Show-SettingsDialog {
         [void]$dialog.ShowDialog($script:Form)
     } finally {
         $dialog.Dispose()
+        $script:SettingsAdapterNames = @()
+        $script:SettingsInventory    = @()
+        $script:SettingsDialog       = $null
+        $script:SettingsCmbPublic    = $null
+        $script:SettingsCmbPrivate   = $null
     }
     Update-Ui -Force
 }
@@ -1628,6 +1685,25 @@ try {
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
     [System.Windows.Forms.Application]::EnableVisualStyles()
     [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
+
+    # Safety net: anything that still escapes a handler is logged and shown as
+    # a plain message instead of the .NET "Unhandled exception" dialog.
+    [System.Windows.Forms.Application]::SetUnhandledExceptionMode(
+        [System.Windows.Forms.UnhandledExceptionMode]::CatchException)
+    [System.Windows.Forms.Application]::add_ThreadException({
+        param($eventSender, $threadEventArgs)
+        try {
+            $exception = $threadEventArgs.Exception
+            Write-Log -Level ERROR -Message ('Unhandled UI exception: {0}: {1}' -f `
+                $exception.GetType().FullName, $exception.Message)
+            if ($exception.StackTrace) {
+                Write-Log -Level ERROR -Message ('  stack: ' + ($exception.StackTrace -replace "`r?`n", ' | '))
+            }
+            Show-ErrorMessage -Message ('Something went wrong inside Camera Internet:' + "`r`n`r`n" + $exception.Message)
+        } catch {
+            # never let the handler itself throw
+        }
+    })
 } catch {
     Write-Log -Level ERROR -Message ('Windows Forms could not be loaded: ' + $_.Exception.Message)
     Write-Host 'Camera Internet needs the Windows Forms components of the .NET Framework, which are not available on this system.' -ForegroundColor Red
